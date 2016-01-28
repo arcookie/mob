@@ -53,6 +53,8 @@
 #include <ctype.h>
 #include <stdarg.h>
 
+#include "mob.h"
+
 #if !defined(_WIN32) && !defined(WIN32)
 # include <signal.h>
 # if !defined(__RTP__) && !defined(_WRS_KERNEL)
@@ -1999,7 +2001,7 @@ static void writefileFunc(
 static void open_db(ShellState *p, int keepAlive){
   if( p->db==0 ){
     sqlite3_initialize();
-    sqlite3_open(p->zDbFilename, &p->db);
+    mob_open_db(p->zDbFilename, &p->db);
     globalDb = p->db;
     if( p->db && sqlite3_errcode(p->db)==SQLITE_OK ){
       sqlite3_create_function(p->db, "shellstatic", 0, SQLITE_UTF8, 0,
@@ -3460,7 +3462,7 @@ static int do_meta_command(char *zLine, ShellState *p){
     p->zDbFilename = zNewFilename;
     open_db(p, 1);
     if( p->db!=0 ){
-      sqlite3_close(savedDb);
+      mob_close_db(savedDb);
       sqlite3_free(p->zFreeOnClose);
       p->zFreeOnClose = zNewFilename;
     }else{
@@ -4970,8 +4972,11 @@ int SQLITE_CDECL main(int argc, char **argv){
   }
   set_table_name(&data, 0);
   if( data.db ){
-    sqlite3_close(data.db);
+    mob_close_db(data.db);
   }
   sqlite3_free(data.zFreeOnClose); 
+
+  mob_close_all();
+
   return rc;
 }
