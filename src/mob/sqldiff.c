@@ -66,29 +66,29 @@ static void strInit(Str *p){
 ** Print an error resulting from faulting command-line arguments and
 ** abort the program.
 */
-static void cmdlineError(const char *zFormat, ...){
-	va_list ap;
-	fprintf(stderr, "%s: ", g.zArgv0);
-	va_start(ap, zFormat);
-	vfprintf(stderr, zFormat, ap);
-	va_end(ap);
-	fprintf(stderr, "\n\"%s --help\" for more help\n", g.zArgv0);
-	exit(1);
-}
+//static void cmdlineError(const char *zFormat, ...){
+//	va_list ap;
+//	fprintf(stderr, "%s: ", g.zArgv0);
+//	va_start(ap, zFormat);
+//	vfprintf(stderr, zFormat, ap);
+//	va_end(ap);
+//	fprintf(stderr, "\n\"%s --help\" for more help\n", g.zArgv0);
+//	exit(1);
+//}
 
 /*
 ** Print an error message for an error that occurs at runtime, then
 ** abort the program.
 */
-static void runtimeError(const char *zFormat, ...){
-	va_list ap;
-	fprintf(stderr, "%s: ", g.zArgv0);
-	va_start(ap, zFormat);
-	vfprintf(stderr, zFormat, ap);
-	va_end(ap);
-	fprintf(stderr, "\n");
-	exit(1);
-}
+//static void runtimeError(const char *zFormat, ...){
+//	va_list ap;
+//	fprintf(stderr, "%s: ", g.zArgv0);
+//	va_start(ap, zFormat);
+//	vfprintf(stderr, zFormat, ap);
+//	va_end(ap);
+//	fprintf(stderr, "\n");
+//	exit(1);
+//}
 
 /*
 ** Free all memory held by a Str object
@@ -190,17 +190,13 @@ static char *safeId(const char *zId){
 */
 static sqlite3_stmt *db_vprepare(const char *zFormat, va_list ap){
 	char *zSql;
-	int rc;
-	sqlite3_stmt *pStmt;
+	sqlite3_stmt *pStmt = 0;
 
 	zSql = sqlite3_vmprintf(zFormat, ap);
-	if (zSql == 0) runtimeError("out of memory");
-	rc = sqlite3_prepare_v2(g.db, zSql, -1, &pStmt, 0);
-	if (rc){
-		runtimeError("SQL statement error: %s\n\"%s\"", sqlite3_errmsg(g.db),
-			zSql);
+	if (zSql) {
+		sqlite3_prepare_v2(g.db, zSql, -1, &pStmt, 0);
+		sqlite3_free(zSql);
 	}
-	sqlite3_free(zSql);
 	return pStmt;
 }
 static sqlite3_stmt *db_prepare(const char *zFormat, ...){
@@ -337,7 +333,7 @@ static char **columnNames(
 	*pnPKey = nPK;
 	naz = nPK;
 	az = sqlite3_malloc(sizeof(char*)*(nPK + 1));
-	if (az == 0) runtimeError("out of memory");
+	if (az == 0) return 0;
 	memset(az, 0, sizeof(char*)*(nPK + 1));
 	while (SQLITE_ROW == sqlite3_step(pStmt)){
 		int iPKey;
@@ -346,7 +342,7 @@ static char **columnNames(
 		}
 		else{
 			az = sqlite3_realloc(az, sizeof(char*)*(naz + 2));
-			if (az == 0) runtimeError("out of memory");
+			if (az == 0) return 0;
 			az[naz++] = safeId((char*)sqlite3_column_text(pStmt, 1));
 		}
 	}
