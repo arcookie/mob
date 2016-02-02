@@ -89,6 +89,7 @@
   <ItemGroup>
     <ClCompile Include="..\src\mob\mob.c" />
     <ClCompile Include="..\src\mob\sqldiff.c" />
+    <ClCompile Include="..\src\mob\util.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -4976,7 +4976,5 @@ int SQLITE_CDECL main(int argc, char **argv){
   }
   sqlite3_free(data.zFreeOnClose); 
 
-  mob_close_all();
-
   return rc;
 }

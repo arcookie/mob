@@ -11,7 +11,6 @@
 extern "C" {
 #endif
 
-	void mob_close_all();
 	int mob_sync_db(sqlite3 * pDb);
 	int mob_close_db(sqlite3 * pDb);
 	int mob_open_db(const char *zFilename, sqlite3 **ppDb);
