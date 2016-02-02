@@ -48,12 +48,12 @@ int mob_close_db(sqlite3 * pDb)
 
 		strInit(&sql);
 
-		strPrintf(&sql, "DELETE FROM documents WHERE ptr_main = %ld;", (long)pDb);
+		strPrintf(&sql, "DELETE FROM works WHERE ptr_main = %ld;", (long)pDb);
 		sqlite3_exec(master_db, sql.z, 0, 0, 0);
 
 		strFree(&sql);
 
-		if (!(sqlite3_get_table(master_db, "SELECT ptr_main FROM documents", &retStrings, &iRows, &iCols, 0) == SQLITE_OK && iRows <= 1 && iCols > 0)) {
+		if (!(sqlite3_get_table(master_db, "SELECT ptr_main FROM works", &retStrings, &iRows, &iCols, 0) == SQLITE_OK && iRows <= 1 && iCols > 0)) {
 			sqlite3_close(master_db);
 			master_db = 0;
 		}
