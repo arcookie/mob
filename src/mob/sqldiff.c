@@ -24,7 +24,6 @@
 #include <ctype.h>
 #include <string.h>
 #include <assert.h>
-#include "sqlite3.h"
 #include "util.h"
 
 /*
@@ -1914,18 +1913,20 @@ static void strPrintfArray(
 //	return 0;
 //}
 
-void get_diff(sqlite3 * pDB, sqlite3 * pBackDB, Str * redo, Str * undo)
+void get_diff(sqlite3 * pDB, const char * zBackDB, Str * redo, Str * undo)
 {
 	const char * table;
-	sqlite3_backup *pBackup = NULL;
-	sqlite3_stmt *pStmt = db_prepare(pDB,
-		"SELECT name FROM main.sqlite_master\n"
-		" WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%'\n"
-		" UNION\n"
-		"SELECT name FROM aux.sqlite_master\n"
-		" WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%'\n"
-		" ORDER BY name"
-		);
+
+	if (!sqlite3_exec(pDB, sqlite3_mprintf("ATTACH %Q as aux;", zBackDB), 0, 0, 0)) {
+		sqlite3 * pBackDB;
+		sqlite3_stmt *pStmt = db_prepare(pDB,
+			"SELECT name FROM main.sqlite_master\n"
+			" WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%'\n"
+			" UNION\n"
+			"SELECT name FROM aux.sqlite_master\n"
+			" WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%'\n"
+			" ORDER BY name"
+			);
 		while (SQLITE_ROW == sqlite3_step(pStmt)){
 			table = (const char*)sqlite3_column_text(pStmt, 0);
 			diff_one_table(pDB, "buffer", "main", table, redo);
@@ -1933,15 +1934,12 @@ void get_diff(sqlite3 * pDB, sqlite3 * pBackDB, Str * redo, Str * undo)
 		}
 		sqlite3_finalize(pStmt);
 
-		if ((pBackup = sqlite3_backup_init(pBackDB, "main", pDB, "main")) != NULL) {
-			sqlite3_backup_step(pBackup, -1);
-			sqlite3_backup_finish(pBackup);
-		}
+		sqlite3_exec(pDB, "DETACH database aux;", 0, 0, 0);
 
-		if ((pBackup = sqlite3_backup_init(pDB, "buffer", pBackDB, "main")) != NULL) {
-			sqlite3_backup_step(pBackup, -1);
-			sqlite3_backup_finish(pBackup);
+		if (sqlite3_open(zBackDB, &pBackDB)) {
+			sqlite3_exec(pBackDB, redo, 0, 0, 0);
+			sqlite3_close(pBackDB);
 		}
-
+	}
 }
 

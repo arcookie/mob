@@ -1710,6 +1710,8 @@ static int shell_exec(
     }
   } /* end while */
 
+  if (rc == SQLITE_OK) mob_sync_db(db);
+
   return rc;
 }
 

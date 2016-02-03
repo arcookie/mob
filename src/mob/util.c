@@ -47,9 +47,9 @@ int strPrintf(Str *p, const char *zFormat, ...)
 		}
 		p->nAlloc = p->nAlloc * 2 + 1000;
 		p->z = sqlite3_realloc(p->z, p->nAlloc);
-		return !!p->z;
+		if (!p->z) break;
 	}
-	return 0;
+	return !!p->z;
 }
 
 

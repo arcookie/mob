@@ -2,6 +2,8 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
+#include "sqlite3.h"
+
 /*
 ** Make sure we can call this stuff from C++.
 */
@@ -34,6 +36,8 @@ extern "C" {
 	** Add formatted text to the end of a Str object
 	*/
 	int strPrintf(Str *p, const char *zFormat, ...);
+
+	void get_diff(sqlite3 * pDB, const char * zBackDB, Str * redo, Str * undo);
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */
