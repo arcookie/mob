@@ -1917,8 +1917,8 @@ void get_diff(sqlite3 * pDB, const char * zBackDB, Str * redo, Str * undo)
 {
 	const char * table;
 
-	if (!sqlite3_exec(pDB, sqlite3_mprintf("ATTACH %Q as aux;", zBackDB), 0, 0, 0)) {
-		sqlite3 * pBackDB;
+//	if (!sqlite3_exec(pDB, sqlite3_mprintf("ATTACH %Q as aux;", zBackDB), 0, 0, 0)) {
+//		sqlite3 * pBackDB;
 		sqlite3_stmt *pStmt = db_prepare(pDB,
 			"SELECT name FROM main.sqlite_master\n"
 			" WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%'\n"
@@ -1929,17 +1929,12 @@ void get_diff(sqlite3 * pDB, const char * zBackDB, Str * redo, Str * undo)
 			);
 		while (SQLITE_ROW == sqlite3_step(pStmt)){
 			table = (const char*)sqlite3_column_text(pStmt, 0);
-			diff_one_table(pDB, "buffer", "main", table, redo);
-			diff_one_table(pDB, "main", "buffer", table, undo);
+			diff_one_table(pDB, "aux", "main", table, redo);
+			diff_one_table(pDB, "main", "aux", table, undo);
 		}
 		sqlite3_finalize(pStmt);
 
-		sqlite3_exec(pDB, "DETACH database aux;", 0, 0, 0);
-
-		if (sqlite3_open(zBackDB, &pBackDB)) {
-			sqlite3_exec(pBackDB, redo, 0, 0, 0);
-			sqlite3_close(pBackDB);
-		}
-	}
+//		sqlite3_exec(pDB, "DETACH database aux;", 0, 0, 0);
+//	}
 }
 

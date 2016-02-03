@@ -45,7 +45,7 @@ static int _close_db(long id, const char * mark, sqlite3 *pDb)
 int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 {
 	if (!master_db && sqlite3_open(":memory:", &master_db) == SQLITE_OK)
-		sqlite3_exec(master_db, "CREATE TABLE works (ptr_main BIGINT PRIMARY KEY, ptr_back BIGINT, ptr_undo BIGINT, ptr_redo BIGINT); PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+		sqlite3_exec(master_db, "CREATE TABLE works (ptr_main BIGINT PRIMARY KEY, ptr_back BIGINT, ptr_undo BIGINT); PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 	else {
 		master_db = 0;
 		return SQLITE_ERROR;
@@ -59,25 +59,20 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 			long id = (long)*ppDb;
 			sqlite3 *pBackDb;
 			sqlite3 *pUndoDb;
-			sqlite3 *pRedoDb;
 
 			if ((nRet = _create_db(id, "bak", &pBackDb)) == SQLITE_OK)
 				sqlite3_exec(pBackDb, "PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 			else return nRet;
 
 			if ((nRet = _create_db(id, "undo", &pUndoDb)) == SQLITE_OK) 
-				sqlite3_exec(pUndoDb, "PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+				sqlite3_exec(pUndoDb, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 			else return nRet;
 
-			if ((nRet = _create_db(id, "redo", &pRedoDb)) == SQLITE_OK) 
-				sqlite3_exec(pRedoDb, "PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
-			else return nRet;
-
-			sqlite3_exec(*ppDb, "PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+			sqlite3_exec(*ppDb, sqlite3_mprintf("PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;ATTACH '%ld_bak.db3' as aux;", id), 0, 0, 0);
 
 			strInit(&sql);
 
-			strPrintf(&sql, "INSERT INTO works VALUES (%ld, %ld, %ld, %ld);", (long)*ppDb, (long)pBackDb, (long)pUndoDb, (long)pRedoDb);
+			strPrintf(&sql, "INSERT INTO works VALUES (%ld, %ld, %ld);", (long)*ppDb, (long)pBackDb, (long)pUndoDb);
 			sqlite3_exec(master_db, sql.z, 0, 0, 0);
 
 			strFree(&sql);
@@ -90,15 +85,34 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 
 int mob_sync_db(sqlite3 * pDb)
 {
-	Str undo, redo;
+	Str undo, redo, bak, sql;
+	sqlite3_stmt *pStmt = NULL;
 
 	strInit(&undo);
 	strInit(&redo);
+	strInit(&bak);
+	strInit(&sql);
 
-	//get_diff(pDb, "", &redo, &undo);
+	strPrintf(&bak, "%ld_bak.db3", (long)pDb);
 
+	get_diff(pDb, bak.z, &redo, &undo);
+
+	strPrintf(&sql, "SELECT ptr_back, ptr_undo FROM works WHERE ptr_main = %ld;", (long)pDb);
+
+	QUERY_SQL(master_db, pStmt, sql.z,
+		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), redo.z, 0, 0, 0);
+
+		strFree(&sql);
+		strPrintf(&sql, "INSERT INTO works (undo, redo) VALUES (%Q, %Q);", undo.z, redo.z);
+
+		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 1), sql.z, 0, 0, 0);
+		break;
+	);
+
+	strFree(&sql);
 	strFree(&redo);
 	strFree(&undo);
+	strFree(&bak);
 
 	return 0;
 }
@@ -112,12 +126,13 @@ int mob_close_db(sqlite3 * pDb)
 
 		strInit(&sql);
 
-		strPrintf(&sql, "SELECT ptr_back, ptr_undo, ptr_redo FROM works WHERE ptr_main = %ld;", (long)pDb);
+		strPrintf(&sql, "SELECT ptr_back, ptr_undo FROM works WHERE ptr_main = %ld;", (long)pDb);
+
+		sqlite3_exec(pDb, "DETACH aux;", 0, 0, 0);
 
 		QUERY_SQL(master_db, pStmt, sql.z,
 			_close_db(id, "bak", (sqlite3 *)sqlite3_column_int64(pStmt, 0));
 			_close_db(id, "undo", (sqlite3 *)sqlite3_column_int64(pStmt, 1));
-			_close_db(id, "redo", (sqlite3 *)sqlite3_column_int64(pStmt, 2));
 		);
 
 		strFree(&sql);
