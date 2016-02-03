@@ -440,7 +440,7 @@ static void printQuoted(Str *out, sqlite3_value *X){
 /*
 ** Output SQL that will recreate the aux.zTab table.
 */
-static void dump_table(sqlite3 * pDB, const char *zTab, Str *out){
+static void dump_table(sqlite3 * pDB, const char *zAux, const char *zTab, Str *out){
 	char *zId = safeId(zTab); /* Name of the table */
 	char **az = 0;            /* List of columns */
 	int nPk;                  /* Number of true primary key columns */
@@ -450,16 +450,16 @@ static void dump_table(sqlite3 * pDB, const char *zTab, Str *out){
 	const char *zSep;         /* Separator string */
 	Str ins;                  /* Beginning of the INSERT statement */
 
-	pStmt = db_prepare(pDB, "SELECT sql FROM aux.sqlite_master WHERE name=%Q", zTab);
+	pStmt = db_prepare(pDB, "SELECT sql FROM %Q.sqlite_master WHERE name=%Q", zAux, zTab);
 	if (SQLITE_ROW == sqlite3_step(pStmt)){
 		strPrintf(out, "%s;\n", sqlite3_column_text(pStmt, 0));
 	}
 	sqlite3_finalize(pStmt);
 //	if (!g.bSchemaOnly){
-	az = columnNames(pDB, "aux", zTab, &nPk, 0);
+	az = columnNames(pDB, zAux, zTab, &nPk, 0);
 		strInit(&ins);
 		if (az == 0){
-			pStmt = db_prepare(pDB, "SELECT * FROM aux.%s", zId);
+			pStmt = db_prepare(pDB, "SELECT * FROM %s.%s", zAux, zId);
 			strPrintf(&ins, "INSERT INTO %s VALUES", zId);
 		}
 		else{
@@ -470,7 +470,7 @@ static void dump_table(sqlite3 * pDB, const char *zTab, Str *out){
 				strPrintf(&sql, "%s %s", zSep, az[i]);
 				zSep = ",";
 			}
-			strPrintf(&sql, " FROM aux.%s", zId);
+			strPrintf(&sql, " FROM %s.%s", zAux, zId);
 			zSep = " ORDER BY";
 			for (i = 1; i <= nPk; i++){
 				strPrintf(&sql, "%s %d", zSep, i);
@@ -501,9 +501,9 @@ static void dump_table(sqlite3 * pDB, const char *zTab, Str *out){
 		sqlite3_finalize(pStmt);
 		strFree(&ins);
 //	} /* endif !g.bSchemaOnly */
-		pStmt = db_prepare(pDB, "SELECT sql FROM aux.sqlite_master"
+		pStmt = db_prepare(pDB, "SELECT sql FROM %Q.sqlite_master"
 		" WHERE type='index' AND tbl_name=%Q AND sql IS NOT NULL",
-		zTab);
+		zAux, zTab);
 	while (SQLITE_ROW == sqlite3_step(pStmt)){
 		strPrintf(out, "%s;\n", sqlite3_column_text(pStmt, 0));
 	}
@@ -514,7 +514,8 @@ static void dump_table(sqlite3 * pDB, const char *zTab, Str *out){
 /*
 ** Compute all differences for a single table.
 */
-static void diff_one_table(sqlite3 * pDB, const char *zTab, Str *out){
+void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab, Str *out)
+{
 	char *zId = safeId(zTab); /* Name of table (translated for us in SQL) */
 	char **az = 0;            /* Columns in main */
 	char **az2 = 0;           /* Columns in aux */
@@ -550,22 +551,22 @@ static void diff_one_table(sqlite3 * pDB, const char *zTab, Str *out){
 	//}
 
 
-	if (sqlite3_table_column_metadata(pDB, "aux", zTab, 0, 0, 0, 0, 0, 0)){
-		if (!sqlite3_table_column_metadata(pDB, "main", zTab, 0, 0, 0, 0, 0, 0)){
+	if (sqlite3_table_column_metadata(pDB, zAux, zTab, 0, 0, 0, 0, 0, 0)){
+		if (!sqlite3_table_column_metadata(pDB, zMain, zTab, 0, 0, 0, 0, 0, 0)){
 			/* Table missing from second database. */
 			strPrintf(out, "DROP TABLE %s;\n", zId);
 		}
 		goto end_diff_one_table;
 	}
 
-	if (sqlite3_table_column_metadata(pDB, "main", zTab, 0, 0, 0, 0, 0, 0)){
+	if (sqlite3_table_column_metadata(pDB, zMain, zTab, 0, 0, 0, 0, 0, 0)){
 		/* Table missing from source */
-		dump_table(pDB, zTab, out);
+		dump_table(pDB, zAux, zTab, out);
 		goto end_diff_one_table;
 	}
 
-	az = columnNames(pDB, "main", zTab, &nPk, 0);
-	az2 = columnNames(pDB, "aux", zTab, &nPk2, 0);
+	az = columnNames(pDB, zMain, zTab, &nPk, 0);
+	az2 = columnNames(pDB, zAux, zTab, &nPk2, 0);
 	if (az && az2){
 		for (n = 0; az[n] && az2[n]; n++){
 			if (sqlite3_stricmp(az[n], az2[n]) != 0) break;
@@ -578,7 +579,7 @@ static void diff_one_table(sqlite3 * pDB, const char *zTab, Str *out){
 		){
 		/* Schema mismatch */
 		strPrintf(out, "DROP TABLE %s; -- due to schema mismatch\n", zId);
-		dump_table(pDB, zTab, out);
+		dump_table(pDB, zAux, zTab, out);
 		goto end_diff_one_table;
 	}
 
@@ -604,7 +605,7 @@ static void diff_one_table(sqlite3 * pDB, const char *zTab, Str *out){
 				az2[i], az2[i], az2[i + 1] == 0 ? "" : ",");
 			i++;
 		}
-		strPrintf(&sql, "  FROM main.%s A, aux.%s B\n", zId, zId);
+		strPrintf(&sql, "  FROM %s.%s A, %s.%s B\n", zMain, zId, zAux, zId);
 		zSep = " WHERE";
 		for (i = 0; i<nPk; i++){
 			strPrintf(&sql, "%s A.%s=B.%s", zSep, az[i], az[i]);
@@ -635,8 +636,8 @@ static void diff_one_table(sqlite3 * pDB, const char *zTab, Str *out){
 		strPrintf(&sql, "       NULL, NULL%s\n", i == n2 - 1 ? "" : ",");
 		i++;
 	}
-	strPrintf(&sql, "  FROM main.%s A\n", zId);
-	strPrintf(&sql, " WHERE NOT EXISTS(SELECT 1 FROM aux.%s B\n", zId);
+	strPrintf(&sql, "  FROM %s.%s A\n", zMain, zId);
+	strPrintf(&sql, " WHERE NOT EXISTS(SELECT 1 FROM %s.%s B\n", zAux, zId);
 	zSep = "                   WHERE";
 	for (i = 0; i<nPk; i++){
 		strPrintf(&sql, "%s A.%s=B.%s", zSep, az[i], az[i]);
@@ -653,8 +654,8 @@ static void diff_one_table(sqlite3 * pDB, const char *zTab, Str *out){
 		strPrintf(&sql, "       1, B.%s%s\n", az2[i], az2[i + 1] == 0 ? "" : ",");
 		i++;
 	}
-	strPrintf(&sql, "  FROM aux.%s B\n", zId);
-	strPrintf(&sql, " WHERE NOT EXISTS(SELECT 1 FROM main.%s A\n", zId);
+	strPrintf(&sql, "  FROM %s.%s B\n", zAux, zId);
+	strPrintf(&sql, " WHERE NOT EXISTS(SELECT 1 FROM %s.%s A\n", zMain, zId);
 	zSep = "                   WHERE";
 	for (i = 0; i<nPk; i++){
 		strPrintf(&sql, "%s A.%s=B.%s", zSep, az[i], az[i]);
@@ -675,13 +676,13 @@ static void diff_one_table(sqlite3 * pDB, const char *zTab, Str *out){
 
 	/* Drop indexes that are missing in the destination */
 	pStmt = db_prepare(pDB,
-		"SELECT name FROM main.sqlite_master"
+		"SELECT name FROM %Q.sqlite_master"
 		" WHERE type='index' AND tbl_name=%Q"
 		"   AND sql IS NOT NULL"
-		"   AND sql NOT IN (SELECT sql FROM aux.sqlite_master"
+		"   AND sql NOT IN (SELECT sql FROM %Q.sqlite_master"
 		"                    WHERE type='index' AND tbl_name=%Q"
 		"                      AND sql IS NOT NULL)",
-		zTab, zTab);
+		zMain, zTab, zAux, zTab);
 	while (SQLITE_ROW == sqlite3_step(pStmt)){
 		char *z = safeId((const char*)sqlite3_column_text(pStmt, 0));
 		strPrintf(out, "DROP INDEX %s;\n", z);
@@ -738,13 +739,13 @@ static void diff_one_table(sqlite3 * pDB, const char *zTab, Str *out){
 
 	/* Create indexes that are missing in the source */
 		pStmt = db_prepare(pDB,
-		"SELECT sql FROM aux.sqlite_master"
+		"SELECT sql FROM %Q.sqlite_master"
 		" WHERE type='index' AND tbl_name=%Q"
 		"   AND sql IS NOT NULL"
-		"   AND sql NOT IN (SELECT sql FROM main.sqlite_master"
+		"   AND sql NOT IN (SELECT sql FROM %Q.sqlite_master"
 		"                    WHERE type='index' AND tbl_name=%Q"
 		"                      AND sql IS NOT NULL)",
-		zTab, zTab);
+		zAux, zTab, zMain, zTab);
 	while (SQLITE_ROW == sqlite3_step(pStmt)){
 		strPrintf(out, "%s;\n", sqlite3_column_text(pStmt, 0));
 	}
@@ -764,16 +765,16 @@ end_diff_one_table:
 ** do not, output an error message on stderr and exit(1). Otherwise, if
 ** the schemas do match, return control to the caller.
 */
-static int checkSchemasMatch(sqlite3 * pDB, const char *zTab){
-	int nRet = 0;
-	sqlite3_stmt *pStmt = db_prepare(pDB, 
-		"SELECT A.sql=B.sql FROM main.sqlite_master A, aux.sqlite_master B"
-		" WHERE A.name=%Q AND B.name=%Q", zTab, zTab
-		);
-	if (SQLITE_ROW == sqlite3_step(pStmt) && sqlite3_column_int(pStmt, 0) != 0) nRet = 1;
-	sqlite3_finalize(pStmt);
-	return nRet;
-}
+//static int checkSchemasMatch(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab){
+//	int nRet = 0;
+//	sqlite3_stmt *pStmt = db_prepare(pDB, 
+//		"SELECT A.sql=B.sql FROM %Q.sqlite_master A, %Q.sqlite_master B"
+//		" WHERE A.name=%Q AND B.name=%Q", zMain, zAux, zTab, zTab
+//		);
+//	if (SQLITE_ROW == sqlite3_step(pStmt) && sqlite3_column_int(pStmt, 0) != 0) nRet = 1;
+//	sqlite3_finalize(pStmt);
+//	return nRet;
+//}
 
 /**************************************************************************
 ** The following code is copied from fossil. It is used to generate the
@@ -1166,80 +1167,80 @@ static void strPrintfArray(
 		strPrintf(pStr, zFmt, az[i], az[i], az[i]);
 	}
 }
-
-static void getRbudiffQuery(
-	const char *zTab,
-	char **azCol,
-	int nPK,
-	int bOtaRowid,
-	Str *pSql
-	){
-	int i;
-
-	/* First the newly inserted rows: **/
-	strPrintf(pSql, "SELECT ");
-	strPrintfArray(pSql, ", ", "%s", azCol, -1);
-	strPrintf(pSql, ", 0, ");       /* Set ota_control to 0 for an insert */
-	strPrintfArray(pSql, ", ", "NULL", azCol, -1);
-	strPrintf(pSql, " FROM aux.%Q AS n WHERE NOT EXISTS (\n", zTab);
-	strPrintf(pSql, "    SELECT 1 FROM ", zTab);
-	strPrintf(pSql, " main.%Q AS o WHERE ", zTab);
-	strPrintfArray(pSql, " AND ", "(n.%Q IS o.%Q)", azCol, nPK);
-	strPrintf(pSql, "\n)");
-
-	/* Deleted rows: */
-	strPrintf(pSql, "\nUNION ALL\nSELECT ");
-	strPrintfArray(pSql, ", ", "%s", azCol, nPK);
-	if (azCol[nPK]){
-		strPrintf(pSql, ", ");
-		strPrintfArray(pSql, ", ", "NULL", &azCol[nPK], -1);
-	}
-	strPrintf(pSql, ", 1, ");       /* Set ota_control to 1 for a delete */
-	strPrintfArray(pSql, ", ", "NULL", azCol, -1);
-	strPrintf(pSql, " FROM main.%Q AS n WHERE NOT EXISTS (\n", zTab);
-	strPrintf(pSql, "    SELECT 1 FROM ", zTab);
-	strPrintf(pSql, " aux.%Q AS o WHERE ", zTab);
-	strPrintfArray(pSql, " AND ", "(n.%Q IS o.%Q)", azCol, nPK);
-	strPrintf(pSql, "\n) ");
-
-	/* Updated rows. If all table columns are part of the primary key, there
-	** can be no updates. In this case this part of the compound SELECT can
-	** be omitted altogether. */
-	if (azCol[nPK]){
-		strPrintf(pSql, "\nUNION ALL\nSELECT ");
-		strPrintfArray(pSql, ", ", "n.%s", azCol, nPK);
-		strPrintf(pSql, ",\n");
-		strPrintfArray(pSql, " ,\n",
-			"    CASE WHEN n.%s IS o.%s THEN NULL ELSE n.%s END", &azCol[nPK], -1
-			);
-
-		if (bOtaRowid == 0){
-			strPrintf(pSql, ", '");
-			strPrintfArray(pSql, "", ".", azCol, nPK);
-			strPrintf(pSql, "' ||\n");
-		}
-		else{
-			strPrintf(pSql, ",\n");
-		}
-		strPrintfArray(pSql, " ||\n",
-			"    CASE WHEN n.%s IS o.%s THEN '.' ELSE 'x' END", &azCol[nPK], -1
-			);
-		strPrintf(pSql, "\nAS ota_control, ");
-		strPrintfArray(pSql, ", ", "NULL", azCol, nPK);
-		strPrintf(pSql, ",\n");
-		strPrintfArray(pSql, " ,\n",
-			"    CASE WHEN n.%s IS o.%s THEN NULL ELSE o.%s END", &azCol[nPK], -1
-			);
-
-		strPrintf(pSql, "\nFROM main.%Q AS o, aux.%Q AS n\nWHERE ", zTab, zTab);
-		strPrintfArray(pSql, " AND ", "(n.%Q IS o.%Q)", azCol, nPK);
-		strPrintf(pSql, " AND ota_control LIKE '%%x%%'");
-	}
-
-	/* Now add an ORDER BY clause to sort everything by PK. */
-	strPrintf(pSql, "\nORDER BY ");
-	for (i = 1; i <= nPK; i++) strPrintf(pSql, "%s%d", ((i>1) ? ", " : ""), i);
-}
+//
+//static void getRbudiffQuery(
+//	const char *zTab,
+//	char **azCol,
+//	int nPK,
+//	int bOtaRowid,
+//	Str *pSql
+//	){
+//	int i;
+//
+//	/* First the newly inserted rows: **/
+//	strPrintf(pSql, "SELECT ");
+//	strPrintfArray(pSql, ", ", "%s", azCol, -1);
+//	strPrintf(pSql, ", 0, ");       /* Set ota_control to 0 for an insert */
+//	strPrintfArray(pSql, ", ", "NULL", azCol, -1);
+//	strPrintf(pSql, " FROM %Q.%Q AS n WHERE NOT EXISTS (\n", zAux, zTab);
+//	strPrintf(pSql, "    SELECT 1 FROM ", zTab);
+//	strPrintf(pSql, " %Q.%Q AS o WHERE ", zMain, zTab);
+//	strPrintfArray(pSql, " AND ", "(n.%Q IS o.%Q)", azCol, nPK);
+//	strPrintf(pSql, "\n)");
+//
+//	/* Deleted rows: */
+//	strPrintf(pSql, "\nUNION ALL\nSELECT ");
+//	strPrintfArray(pSql, ", ", "%s", azCol, nPK);
+//	if (azCol[nPK]){
+//		strPrintf(pSql, ", ");
+//		strPrintfArray(pSql, ", ", "NULL", &azCol[nPK], -1);
+//	}
+//	strPrintf(pSql, ", 1, ");       /* Set ota_control to 1 for a delete */
+//	strPrintfArray(pSql, ", ", "NULL", azCol, -1);
+//	strPrintf(pSql, " FROM %Q.%Q AS n WHERE NOT EXISTS (\n", zMain, zTab);
+//	strPrintf(pSql, "    SELECT 1 FROM ", zTab);
+//	strPrintf(pSql, " %Q.%Q AS o WHERE ", zAux, zTab);
+//	strPrintfArray(pSql, " AND ", "(n.%Q IS o.%Q)", azCol, nPK);
+//	strPrintf(pSql, "\n) ");
+//
+//	/* Updated rows. If all table columns are part of the primary key, there
+//	** can be no updates. In this case this part of the compound SELECT can
+//	** be omitted altogether. */
+//	if (azCol[nPK]){
+//		strPrintf(pSql, "\nUNION ALL\nSELECT ");
+//		strPrintfArray(pSql, ", ", "n.%s", azCol, nPK);
+//		strPrintf(pSql, ",\n");
+//		strPrintfArray(pSql, " ,\n",
+//			"    CASE WHEN n.%s IS o.%s THEN NULL ELSE n.%s END", &azCol[nPK], -1
+//			);
+//
+//		if (bOtaRowid == 0){
+//			strPrintf(pSql, ", '");
+//			strPrintfArray(pSql, "", ".", azCol, nPK);
+//			strPrintf(pSql, "' ||\n");
+//		}
+//		else{
+//			strPrintf(pSql, ",\n");
+//		}
+//		strPrintfArray(pSql, " ||\n",
+//			"    CASE WHEN n.%s IS o.%s THEN '.' ELSE 'x' END", &azCol[nPK], -1
+//			);
+//		strPrintf(pSql, "\nAS ota_control, ");
+//		strPrintfArray(pSql, ", ", "NULL", azCol, nPK);
+//		strPrintf(pSql, ",\n");
+//		strPrintfArray(pSql, " ,\n",
+//			"    CASE WHEN n.%s IS o.%s THEN NULL ELSE o.%s END", &azCol[nPK], -1
+//			);
+//
+//		strPrintf(pSql, "\nFROM %Q.%Q AS o, %Q.%Q AS n\nWHERE ", zMain, zTab, zAux, zTab);
+//		strPrintfArray(pSql, " AND ", "(n.%Q IS o.%Q)", azCol, nPK);
+//		strPrintf(pSql, " AND ota_control LIKE '%%x%%'");
+//	}
+//
+//	/* Now add an ORDER BY clause to sort everything by PK. */
+//	strPrintf(pSql, "\nORDER BY ");
+//	for (i = 1; i <= nPK; i++) strPrintf(pSql, "%s%d", ((i>1) ? ", " : ""), i);
+//}
 //
 //static void rbudiff_one_table(const char *zTab, Str *out){
 //	int bOtaRowid;                  /* True to use an ota_rowid column */
@@ -1913,4 +1914,34 @@ static void getRbudiffQuery(
 //	return 0;
 //}
 
+void get_diff(sqlite3 * pDB, sqlite3 * pBackDB, Str * redo, Str * undo)
+{
+	const char * table;
+	sqlite3_backup *pBackup = NULL;
+	sqlite3_stmt *pStmt = db_prepare(pDB,
+		"SELECT name FROM main.sqlite_master\n"
+		" WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%'\n"
+		" UNION\n"
+		"SELECT name FROM aux.sqlite_master\n"
+		" WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%'\n"
+		" ORDER BY name"
+		);
+		while (SQLITE_ROW == sqlite3_step(pStmt)){
+			table = (const char*)sqlite3_column_text(pStmt, 0);
+			diff_one_table(pDB, "buffer", "main", table, redo);
+			diff_one_table(pDB, "main", "buffer", table, undo);
+		}
+		sqlite3_finalize(pStmt);
+
+		if ((pBackup = sqlite3_backup_init(pBackDB, "main", pDB, "main")) != NULL) {
+			sqlite3_backup_step(pBackup, -1);
+			sqlite3_backup_finish(pBackup);
+		}
+
+		if ((pBackup = sqlite3_backup_init(pDB, "buffer", pBackDB, "main")) != NULL) {
+			sqlite3_backup_step(pBackup, -1);
+			sqlite3_backup_finish(pBackup);
+		}
+
+}
 
