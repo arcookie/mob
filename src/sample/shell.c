@@ -1710,7 +1710,7 @@ static int shell_exec(
     }
   } /* end while */
 
-  if (rc == SQLITE_OK) mob_sync_db(db);
+  if (rc == SQLITE_OK) mob_sync_db(db, 1);
 
   return rc;
 }
@@ -4988,3 +4988,4 @@ int SQLITE_CDECL main(int argc, char **argv){
 
   return rc;
 }
+

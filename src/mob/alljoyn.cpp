@@ -36,6 +36,7 @@ static const char* CHAT_SERVICE_INTERFACE_NAME = "org.alljoyn.bus.samples.chat";
 static const char* NAME_PREFIX = "org.alljoyn.bus.samples.chat.";
 static const char* CHAT_SERVICE_OBJECT_PATH = "/chatService";
 static const SessionPort CHAT_PORT = 27;
+static fnSendHandler gSendHandler = NULL;
 
 /* static data. */
 static ajn::BusAttachment* s_bus = NULL;
@@ -124,7 +125,9 @@ class ChatObject : public BusObject {
     {
         QCC_UNUSED(member);
         QCC_UNUSED(srcPath);
-        printf("%s: %s\n", msg->GetSender(), msg->GetArg(0)->v_string.str);
+
+		if (gSendHandler) gSendHandler(msg->GetArg(0)->v_string.str);
+//        printf("%s:!!! %s\n", msg->GetSender(), msg->GetArg(0)->v_string.str);
     }
 
 	virtual void GetProp(const InterfaceDescription::Member* member, Message& msg) 
@@ -230,9 +233,12 @@ static void Usage()
 /** Parse the the command line arguments. If a problem occurs exit via Usage(). */
 static void ParseCommandLine(int argc, char** argv)
 {
-    /* Parse command line args */
+	s_advertisedName = NAME_PREFIX;
+	s_advertisedName += "test";
+
+	/* Parse command line args */
     for (int i = 1; i < argc; ++i) {
-        if (0 == ::strcmp("-s", argv[i])) {
+/*        if (0 == ::strcmp("-s", argv[i])) {
             if ((++i < argc) && (argv[i][0] != '-')) {
                 s_advertisedName = NAME_PREFIX;
                 s_advertisedName += argv[i];
@@ -240,7 +246,7 @@ static void ParseCommandLine(int argc, char** argv)
                 printf("Missing parameter for \"-s\" option\n");
                 Usage();
             }
-        } else if (0 == ::strcmp("-j", argv[i])) {
+        } else*/ if (0 == ::strcmp("-j", argv[i])) {
             if ((++i < argc) && (argv[i][0] != '-')) {
                 s_joinName = NAME_PREFIX;
                 s_joinName += argv[i];
@@ -518,6 +524,11 @@ void alljoyn_disconnect(void)
 int alljoyn_send(const char * sText)
 {
 	return (QStatus)s_chatObj->SendChatSignal(sText);
+}
+
+void alljoyn_set_handler(fnSendHandler fnProc)
+{
+	gSendHandler = fnProc;
 }
 
 #ifdef __cplusplus

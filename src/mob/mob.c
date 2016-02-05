@@ -10,8 +10,21 @@
 
 sqlite3 * master_db = 0;           /* The database */
 
+int SendHandler(const char * sText)
+{
+	sqlite3 * pDb;
+	sqlite3_stmt *pStmt = NULL;
+
+	mob_open_db("test", &pDb);
+
+	sqlite3_exec(pDb, sText, 0, 0, 0);
+	mob_sync_db(pDb, 0);
+}
+
 int mob_init(int argc, char** argv)
 {
+	alljoyn_set_handler(&SendHandler);
+
 	return alljoyn_connect(argc, argv);
 }
 
@@ -94,7 +107,7 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 	return SQLITE_ERROR;
 }
 
-int mob_sync_db(sqlite3 * pDb)
+int mob_sync_db(sqlite3 * pDb, int send)
 {
 	Str undo, redo, bak, sql;
 	sqlite3_stmt *pStmt = NULL;
@@ -120,7 +133,7 @@ int mob_sync_db(sqlite3 * pDb)
 		break;
 	);
 
-	alljoyn_send(redo.z);
+	if (send) alljoyn_send(redo.z);
 
 	strFree(&sql);
 	strFree(&redo);
