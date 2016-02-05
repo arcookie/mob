@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <signal.h>
+#include "mob_alljoyn.h"
 
 using namespace ajn;
 
@@ -45,7 +46,7 @@ static SessionId s_sessionId = 0;
 static bool s_joinComplete = false;
 static volatile sig_atomic_t s_interrupt = false;
 
-static void CDECL_CALL SigIntHandler(int sig)
+void CDECL_CALL SigIntHandler(int sig)
 {
     QCC_UNUSED(sig);
     s_interrupt = true;
@@ -125,6 +126,18 @@ class ChatObject : public BusObject {
         QCC_UNUSED(srcPath);
         printf("%s: %s\n", msg->GetSender(), msg->GetArg(0)->v_string.str);
     }
+
+	virtual void GetProp(const InterfaceDescription::Member* member, Message& msg) 
+	{
+		QCC_UNUSED(member);
+		QCC_UNUSED(msg);
+	}
+
+	virtual void SetProp(const InterfaceDescription::Member* member, Message& msg)
+	{
+		QCC_UNUSED(member);
+		QCC_UNUSED(msg);
+	}
 
   private:
     const InterfaceDescription::Member* chatSignalMember;
@@ -398,119 +411,113 @@ QStatus WaitForJoinSessionCompletion(void)
 
 /** Take input from stdin and send it as a chat message, continue until an error or
  * SIGINT occurs, return the result status. */
-QStatus DoTheChat(void)
+int alljoyn_connect(int argc, char** argv)
 {
-    const int bufSize = 1024;
-    char buf[bufSize];
-    QStatus status = ER_OK;
+	/* Install SIGINT handler. */
+	signal(SIGINT, SigIntHandler);
 
-    while ((ER_OK == status) && (get_line(buf, bufSize, stdin))) {
-        status = s_chatObj->SendChatSignal(buf);
-    }
+	ParseCommandLine(argc, argv);
+	ValidateCommandLine();
 
-    return status;
+	QStatus status = AllJoynInit();
+
+#ifdef ROUTER
+	if (ER_OK == status) {
+		status = AllJoynRouterInit();
+		if (ER_OK != status) {
+			AllJoynShutdown();
+		}
+	}
+#endif
+
+	if (ER_OK == status) {
+		/* Create message bus */
+		s_bus = new BusAttachment("chat", true);
+
+		if (s_bus) {
+
+			if (ER_OK == status) {
+				status = CreateInterface();
+			}
+
+			if (ER_OK == status) {
+				s_bus->RegisterBusListener(s_busListener);
+			}
+
+			if (ER_OK == status) {
+				status = StartMessageBus();
+			}
+
+			/* Create the bus object that will be used to send and receive signals */
+			s_chatObj = new ChatObject(*s_bus, CHAT_SERVICE_OBJECT_PATH);
+
+			if (ER_OK == status) {
+				status = RegisterBusObject();
+			}
+
+			if (ER_OK == status) {
+				status = ConnectBusAttachment();
+			}
+
+			/* Advertise or discover based on command line options */
+			if (!s_advertisedName.empty()) {
+				/*
+				* Advertise this service on the bus.
+				* There are three steps to advertising this service on the bus.
+				* 1) Request a well-known name that will be used by the client to discover
+				*    this service.
+				* 2) Create a session.
+				* 3) Advertise the well-known name.
+				*/
+				if (ER_OK == status) {
+					status = RequestName();
+				}
+
+				const TransportMask SERVICE_TRANSPORT_TYPE = TRANSPORT_ANY;
+
+				if (ER_OK == status) {
+					status = CreateSession(SERVICE_TRANSPORT_TYPE);
+				}
+
+				if (ER_OK == status) {
+					status = AdvertiseName(SERVICE_TRANSPORT_TYPE);
+				}
+			}
+			else {
+				if (ER_OK == status) {
+					status = FindAdvertisedName();
+				}
+
+				if (ER_OK == status) {
+					status = WaitForJoinSessionCompletion();
+				}
+			}
+		}
+	}
+	else {
+		status = ER_OUT_OF_MEMORY;
+	}
+
+	return (int)status;
 }
 
-int CDECL_CALL main(int argc, char** argv)
+void alljoyn_disconnect(void)
 {
-    if (AllJoynInit() != ER_OK) {
-        return 1;
-    }
-#ifdef ROUTER
-    if (AllJoynRouterInit() != ER_OK) {
-        AllJoynShutdown();
-        return 1;
-    }
-#endif
-
-    /* Install SIGINT handler. */
-    signal(SIGINT, SigIntHandler);
-
-    ParseCommandLine(argc, argv);
-    ValidateCommandLine();
-
-    QStatus status = ER_OK;
-
-    /* Create message bus */
-    s_bus = new BusAttachment("chat", true);
-
-    if (s_bus) {
-        if (ER_OK == status) {
-            status = CreateInterface();
-        }
-
-        if (ER_OK == status) {
-            s_bus->RegisterBusListener(s_busListener);
-        }
-
-        if (ER_OK == status) {
-            status = StartMessageBus();
-        }
-
-        /* Create the bus object that will be used to send and receive signals */
-        ChatObject chatObj(*s_bus, CHAT_SERVICE_OBJECT_PATH);
-
-        s_chatObj = &chatObj;
-
-        if (ER_OK == status) {
-            status = RegisterBusObject();
-        }
-
-        if (ER_OK == status) {
-            status = ConnectBusAttachment();
-        }
-
-        /* Advertise or discover based on command line options */
-        if (!s_advertisedName.empty()) {
-            /*
-             * Advertise this service on the bus.
-             * There are three steps to advertising this service on the bus.
-             * 1) Request a well-known name that will be used by the client to discover
-             *    this service.
-             * 2) Create a session.
-             * 3) Advertise the well-known name.
-             */
-            if (ER_OK == status) {
-                status = RequestName();
-            }
-
-            const TransportMask SERVICE_TRANSPORT_TYPE = TRANSPORT_ANY;
-
-            if (ER_OK == status) {
-                status = CreateSession(SERVICE_TRANSPORT_TYPE);
-            }
-
-            if (ER_OK == status) {
-                status = AdvertiseName(SERVICE_TRANSPORT_TYPE);
-            }
-        } else {
-            if (ER_OK == status) {
-                status = FindAdvertisedName();
-            }
-
-            if (ER_OK == status) {
-                status = WaitForJoinSessionCompletion();
-            }
-        }
-
-        if (ER_OK == status) {
-            status = DoTheChat();
-        }
-    } else {
-        status = ER_OUT_OF_MEMORY;
-    }
-
-    /* Cleanup */
-    delete s_bus;
-    s_bus = NULL;
-
-    printf("Chat exiting with status 0x%04x (%s).\n", status, QCC_StatusText(status));
+	if (s_bus) {
+		/* Cleanup */
+		delete s_bus;
+		s_bus = NULL;
+	}
 
 #ifdef ROUTER
-    AllJoynRouterShutdown();
+	AllJoynRouterShutdown();
 #endif
-    AllJoynShutdown();
-    return (int) status;
+	AllJoynShutdown();
+}
+
+int alljoyn_send(const char * sText)
+{
+	return (QStatus)s_chatObj->SendChatSignal(sText);
 }
 
 #ifdef __cplusplus

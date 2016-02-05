@@ -2,12 +2,23 @@
 #include "mob.h"
 #include <stdio.h>
 #include "util.h"
+#include "mob_alljoyn.h"
 
 #define QUERY_SQL(__db__, __stmt__, __sql__, ...)	\
 	if (sqlite3_prepare_v2(__db__, __sql__, -1, &__stmt__, NULL) == SQLITE_OK) {while (sqlite3_step(__stmt__) == SQLITE_ROW) { __VA_ARGS__ } \
 	sqlite3_finalize(__stmt__); __stmt__ = NULL;}
 
 sqlite3 * master_db = 0;           /* The database */
+
+int mob_init(int argc, char** argv)
+{
+	return alljoyn_connect(argc, argv);
+}
+
+void mob_exit(void)
+{
+	alljoyn_disconnect();
+}
 
 static int _create_db(long id, const char * mark, sqlite3 **ppDb)
 {
@@ -108,6 +119,8 @@ int mob_sync_db(sqlite3 * pDb)
 		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 1), sql.z, 0, 0, 0);
 		break;
 	);
+
+	alljoyn_send(redo.z);
 
 	strFree(&sql);
 	strFree(&redo);

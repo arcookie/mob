@@ -4634,6 +4634,11 @@ int SQLITE_CDECL main(int argc, char **argv){
   int readStdin = 1;
   int nCmd = 0;
   char **azCmd = 0;
+  
+  if (mob_init(argc, argv)) {
+	  utf8_printf(stderr, "Error occured in mob_init().\n");
+	  exit(1);
+  }
 
 #if USE_SYSTEM_SQLITE+0!=1
   if( strcmp(sqlite3_sourceid(),SQLITE_SOURCE_ID)!=0 ){
@@ -4907,11 +4912,12 @@ int SQLITE_CDECL main(int argc, char **argv){
           if( bail_on_error ) return rc;
         }
       }
-    }else{
-      utf8_printf(stderr,"%s: Error: unknown option: %s\n", Argv0, z);
-      raw_printf(stderr,"Use -help for a list of options.\n");
-      return 1;
     }
+//	else{
+//      utf8_printf(stderr,"%s: Error: unknown option: %s\n", Argv0, z);
+//      raw_printf(stderr,"Use -help for a list of options.\n");
+//      return 1;
+//    }
   }
 
   if( !readStdin ){
@@ -4977,6 +4983,8 @@ int SQLITE_CDECL main(int argc, char **argv){
     mob_close_db(data.db);
   }
   sqlite3_free(data.zFreeOnClose); 
+
+  mob_exit();
 
   return rc;
 }

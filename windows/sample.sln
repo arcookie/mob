@@ -13,8 +13,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sample", "sample.vcxproj", 
 		{B6D9DEB7-A084-47D9-8BF7-294C4407BA1A} = {B6D9DEB7-A084-47D9-8BF7-294C4407BA1A}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "chat", "chatsample.vcxproj", "{D1D8EC18-0964-4377-A569-2579D6BE39F7}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -41,14 +39,6 @@ Global
 		{27D5445B-3D86-44C6-8226-360342F176BC}.Release|Win32.ActiveCfg = Release|Win32
 		{27D5445B-3D86-44C6-8226-360342F176BC}.Release|Win32.Build.0 = Release|Win32
 		{27D5445B-3D86-44C6-8226-360342F176BC}.Release|x64.ActiveCfg = Release|Win32
-		{D1D8EC18-0964-4377-A569-2579D6BE39F7}.Debug|Win32.ActiveCfg = Debug|Win32
-		{D1D8EC18-0964-4377-A569-2579D6BE39F7}.Debug|Win32.Build.0 = Debug|Win32
-		{D1D8EC18-0964-4377-A569-2579D6BE39F7}.Debug|x64.ActiveCfg = Debug|x64
-		{D1D8EC18-0964-4377-A569-2579D6BE39F7}.Debug|x64.Build.0 = Debug|x64
-		{D1D8EC18-0964-4377-A569-2579D6BE39F7}.Release|Win32.ActiveCfg = Release|Win32
-		{D1D8EC18-0964-4377-A569-2579D6BE39F7}.Release|Win32.Build.0 = Release|Win32
-		{D1D8EC18-0964-4377-A569-2579D6BE39F7}.Release|x64.ActiveCfg = Release|x64
-		{D1D8EC18-0964-4377-A569-2579D6BE39F7}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
