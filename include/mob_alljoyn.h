@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-	typedef int(*fnSendHandler)(const char * sText);
+	typedef int(*fnSendHandler)(const char * sText, int nLength);
 
 	void alljoyn_set_handler(fnSendHandler fnProc);
 	void alljoyn_disconnect(void);

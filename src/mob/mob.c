@@ -10,7 +10,7 @@
 
 sqlite3 * master_db = 0;           /* The database */
 
-int SendHandler(const char * sText)
+int SendHandler(const char * sText, int nLength)
 {
 	sqlite3_stmt *pStmt = NULL;
 
@@ -129,11 +129,11 @@ int mob_sync_db(sqlite3 * pDb, int send)
 		QUERY_SQL(master_db, pStmt, sql.z,
 			sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), redo.z, 0, 0, 0);
 
-		strFree(&sql);
-		strPrintf(&sql, "INSERT INTO works (undo, redo) VALUES (%Q, %Q);", undo.z, redo.z);
+			strFree(&sql);
+			strPrintf(&sql, "INSERT INTO works (undo, redo) VALUES (%Q, %Q);", undo.z, redo.z);
 
-		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 1), sql.z, 0, 0, 0);
-		break;
+			sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 1), sql.z, 0, 0, 0);
+			break;
 		);
 
 		if (send) alljoyn_send(redo.z);

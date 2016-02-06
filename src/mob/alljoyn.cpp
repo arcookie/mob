@@ -53,34 +53,6 @@ void CDECL_CALL SigIntHandler(int sig)
     s_interrupt = true;
 }
 
-/*
- * get a line of input from the the file pointer (most likely stdin).
- * This will capture the the num-1 characters or till a newline character is
- * entered.
- *
- * @param[out] str a pointer to a character array that will hold the user input
- * @param[in]  num the size of the character array 'str'
- * @param[in]  fp  the file pointer the sting will be read from. (most likely stdin)
- *
- * @return returns the same string as 'str' if there has been a read error a null
- *                 pointer will be returned and 'str' will remain unchanged.
- */
-char*get_line(char*str, size_t num, FILE*fp)
-{
-    char*p = fgets(str, num, fp);
-
-    // fgets will capture the '\n' character if the string entered is shorter than
-    // num. Remove the '\n' from the end of the line and replace it with nul '\0'.
-    if (p != NULL) {
-        size_t last = strlen(str) - 1;
-        if (str[last] == '\n') {
-            str[last] = '\0';
-        }
-    }
-
-    return s_interrupt ? NULL : p;
-}
-
 /* Bus object */
 class ChatObject : public BusObject {
   public:
@@ -112,7 +84,7 @@ class ChatObject : public BusObject {
     /** Send a Chat signal */
     QStatus SendChatSignal(const char* msg) {
 
-        MsgArg chatArg("s", msg);
+        MsgArg chatArg("ay", strlen(msg), msg);
         uint8_t flags = 0;
         if (0 == s_sessionId) {
             printf("Sending Chat signal without a session id\n");
@@ -126,8 +98,14 @@ class ChatObject : public BusObject {
         QCC_UNUSED(member);
         QCC_UNUSED(srcPath);
 
-		if (gSendHandler) gSendHandler(msg->GetArg(0)->v_string.str);
-        printf("%s: %ssqlite>", msg->GetSender(), msg->GetArg(0)->v_string.str);
+		if (gSendHandler) {
+			uint8_t * data;
+			size_t size;
+
+			msg->GetArg(0)->Get("ay", &size, &data);
+			gSendHandler((const char *)data, size);
+			printf("%s:(%d) %ssqlite>", msg->GetSender(), size, (const char *)data);
+		}
     }
 
 	virtual void GetProp(const InterfaceDescription::Member* member, Message& msg) 
@@ -281,7 +259,7 @@ QStatus CreateInterface(void)
     QStatus status = s_bus->CreateInterface(CHAT_SERVICE_INTERFACE_NAME, chatIntf);
 
     if (ER_OK == status) {
-        chatIntf->AddSignal("Chat", "s",  "str", 0);
+        chatIntf->AddSignal("Chat", "ay",  "data", 0);
         chatIntf->Activate();
     } else {
         printf("Failed to create interface \"%s\" (%s)\n", CHAT_SERVICE_INTERFACE_NAME, QCC_StatusText(status));
