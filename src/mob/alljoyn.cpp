@@ -127,7 +127,7 @@ class ChatObject : public BusObject {
         QCC_UNUSED(srcPath);
 
 		if (gSendHandler) gSendHandler(msg->GetArg(0)->v_string.str);
-//        printf("%s:!!! %s\n", msg->GetSender(), msg->GetArg(0)->v_string.str);
+        printf("%s: %ssqlite>", msg->GetSender(), msg->GetArg(0)->v_string.str);
     }
 
 	virtual void GetProp(const InterfaceDescription::Member* member, Message& msg) 
@@ -169,9 +169,9 @@ class MyBusListener : public BusListener, public SessionPortListener, public Ses
             uint32_t timeout = 20;
             status = s_bus->SetLinkTimeout(s_sessionId, timeout);
             if (ER_OK == status) {
-                printf("Set link timeout to %d\n", timeout);
+                printf("Set link timeout to %d\nsqlite> ", timeout);
             } else {
-                printf("Set link timeout failed\n");
+                printf("Set link timeout failed\nsqlite> ");
             }
             s_joinComplete = true;
         }
@@ -179,21 +179,21 @@ class MyBusListener : public BusListener, public SessionPortListener, public Ses
     void LostAdvertisedName(const char* name, TransportMask transport, const char* namePrefix)
     {
         QCC_UNUSED(namePrefix);
-        printf("Got LostAdvertisedName for %s from transport 0x%x\n", name, transport);
+        printf("Got LostAdvertisedName for %s from transport 0x%x\nsqlite> ", name, transport);
     }
     void NameOwnerChanged(const char* busName, const char* previousOwner, const char* newOwner)
     {
-        printf("NameOwnerChanged: name=%s, oldOwner=%s, newOwner=%s\n", busName, previousOwner ? previousOwner : "<none>",
+        printf("NameOwnerChanged: name=%s, oldOwner=%s, newOwner=%s\nsqlite> ", busName, previousOwner ? previousOwner : "<none>",
                newOwner ? newOwner : "<none>");
     }
     bool AcceptSessionJoiner(SessionPort sessionPort, const char* joiner, const SessionOpts& opts)
     {
         if (sessionPort != CHAT_PORT) {
-            printf("Rejecting join attempt on non-chat session port %d\n", sessionPort);
+            printf("Rejecting join attempt on non-chat session port %d\nsqlite> ", sessionPort);
             return false;
         }
 
-        printf("Accepting join session request from %s (opts.proximity=%x, opts.traffic=%x, opts.transports=%x)\n",
+        printf("Accepting join session request from %s (opts.proximity=%x, opts.traffic=%x, opts.transports=%x)\nsqlite> ",
                joiner, opts.proximity, opts.traffic, opts.transports);
         return true;
     }
@@ -208,9 +208,9 @@ class MyBusListener : public BusListener, public SessionPortListener, public Ses
         uint32_t timeout = 20;
         QStatus status = s_bus->SetLinkTimeout(s_sessionId, timeout);
         if (ER_OK == status) {
-            printf("Set link timeout to %d\n", timeout);
+            printf("Set link timeout to %d\nsqlite> ", timeout);
         } else {
-            printf("Set link timeout failed\n");
+            printf("Set link timeout failed\nsqlite> ");
         }
     }
 };
@@ -233,12 +233,9 @@ static void Usage()
 /** Parse the the command line arguments. If a problem occurs exit via Usage(). */
 static void ParseCommandLine(int argc, char** argv)
 {
-	s_advertisedName = NAME_PREFIX;
-	s_advertisedName += "test";
-
 	/* Parse command line args */
     for (int i = 1; i < argc; ++i) {
-/*        if (0 == ::strcmp("-s", argv[i])) {
+        if (0 == ::strcmp("-s", argv[i])) {
             if ((++i < argc) && (argv[i][0] != '-')) {
                 s_advertisedName = NAME_PREFIX;
                 s_advertisedName += argv[i];
@@ -246,7 +243,7 @@ static void ParseCommandLine(int argc, char** argv)
                 printf("Missing parameter for \"-s\" option\n");
                 Usage();
             }
-        } else*/ if (0 == ::strcmp("-j", argv[i])) {
+        } else if (0 == ::strcmp("-j", argv[i])) {
             if ((++i < argc) && (argv[i][0] != '-')) {
                 s_joinName = NAME_PREFIX;
                 s_joinName += argv[i];

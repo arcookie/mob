@@ -12,13 +12,13 @@ sqlite3 * master_db = 0;           /* The database */
 
 int SendHandler(const char * sText)
 {
-	sqlite3 * pDb;
 	sqlite3_stmt *pStmt = NULL;
 
-	mob_open_db("test", &pDb);
-
-	sqlite3_exec(pDb, sText, 0, 0, 0);
-	mob_sync_db(pDb, 0);
+	QUERY_SQL(master_db, pStmt, "SELECT ptr_main FROM works",
+		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), sText, 0, 0, 0);
+		mob_sync_db((sqlite3 *)sqlite3_column_int64(pStmt, 0), 0);
+		break;
+	);
 }
 
 int mob_init(int argc, char** argv)
@@ -109,6 +109,7 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 
 int mob_sync_db(sqlite3 * pDb, int send)
 {
+	int done = 0;
 	Str undo, redo, bak, sql;
 	sqlite3_stmt *pStmt = NULL;
 
@@ -121,19 +122,22 @@ int mob_sync_db(sqlite3 * pDb, int send)
 
 	get_diff(pDb, bak.z, &redo, &undo);
 
-	strPrintf(&sql, "SELECT ptr_back, ptr_undo FROM works WHERE ptr_main = %ld;", (long)pDb);
+	if (redo.z){
 
-	QUERY_SQL(master_db, pStmt, sql.z,
-		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), redo.z, 0, 0, 0);
+		strPrintf(&sql, "SELECT ptr_back, ptr_undo FROM works WHERE ptr_main = %ld;", (long)pDb);
+
+		QUERY_SQL(master_db, pStmt, sql.z,
+			sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), redo.z, 0, 0, 0);
 
 		strFree(&sql);
 		strPrintf(&sql, "INSERT INTO works (undo, redo) VALUES (%Q, %Q);", undo.z, redo.z);
 
 		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 1), sql.z, 0, 0, 0);
 		break;
-	);
+		);
 
-	if (send) alljoyn_send(redo.z);
+		if (send) alljoyn_send(redo.z);
+	}
 
 	strFree(&sql);
 	strFree(&redo);
