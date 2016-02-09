@@ -69,7 +69,7 @@ static int _close_db(long id, const char * mark, sqlite3 *pDb)
 int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 {
 	if (!master_db && sqlite3_open(":memory:", &master_db) == SQLITE_OK)
-		sqlite3_exec(master_db, "CREATE TABLE works (ptr_main BIGINT PRIMARY KEY, ptr_back BIGINT, ptr_undo BIGINT); PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+		sqlite3_exec(master_db, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, ptr_main BIGINT PRIMARY KEY, ptr_back BIGINT, ptr_undo BIGINT); PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 	else {
 		master_db = 0;
 		return SQLITE_ERROR;

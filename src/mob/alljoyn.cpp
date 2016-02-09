@@ -89,6 +89,8 @@ class ChatObject : public BusObject {
         if (0 == s_sessionId) {
             printf("Sending Chat signal without a session id\n");
         }
+		printf("SendChatSignal: %s\n", chatSignalMember->name.c_str());
+		
         return Signal(NULL, s_sessionId, *chatSignalMember, &chatArg, 1, 0, flags);
     }
 
@@ -191,6 +193,19 @@ class MyBusListener : public BusListener, public SessionPortListener, public Ses
             printf("Set link timeout failed\nsqlite> ");
         }
     }
+	virtual void SessionMemberAdded(SessionId sessionId, const char* uniqueName) {
+		printf("SessionMemberAdded with %s (id=%d)\n", uniqueName, sessionId);
+	}
+
+	/**
+	* Called by the bus when a member of a multipoint session is removed.
+	*
+	* @param sessionId     Id of session whose member(s) changed.
+	* @param uniqueName    Unique name of member who was removed.
+	*/
+	virtual void SessionMemberRemoved(SessionId sessionId, const char* uniqueName) {
+		printf("SessionMemberRemoved with %s (id=%d)\n", uniqueName, sessionId);
+	}
 };
 
 /* More static data. */
