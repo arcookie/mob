@@ -1,0 +1,122 @@
+
+* PKT_HEADER , body 로 발송하기
+
+  int foot_print[16];
+  int wid;  // doc id
+  int action; // 0 데이터, 1 파일리스트 2 파일리스트 전송요청 3 파일
+  int chain;
+
+- data packet
+
+  int chain;
+  int length; // 양수이면 중간 음수이면 끝.
+  char * data;
+
+  바디 구조 (redo 테이블에 저장 uid, snum, base)
+
+  int uid
+
+  int snum
+
+  char base[1024];
+
+  char * data; 
+
+* 맴버 테이블
+
+  int uid;
+
+  int connected;
+
+  char pwd[32];
+
+  char key[32]; // 개별 전송용
+
+  - 변경이슈마다 개설자의 맴버 테이블 동기화(브로드케스팅).
+
+* apply 테이블
+
+  redo 테이블과 같은 구조 uid, snum, base, data
+
+  압축 및 정리할것.
+
+* 파일 uri 채취
+
+- 실행시 임시폴더 초기화
+
+- 파일 uri 를 채취하여 리스트로 만들기 및 전송(브로드케스팅)
+
+  테이블 구조
+
+  int num
+
+  int uid
+
+  int ftime
+
+  int size
+
+  varchar uri[1024]
+
+  varchar path[1024] // saved path
+
+  바디 구조
+
+  int count;
+
+{
+  int uid;
+
+  char uri[1024]; // original path uri: file://...
+
+  int ftime; // modify
+
+  int size;
+}
+
+- 리스트를 보내고 없거나 수정된 리스트만 전송 요청 (개별적)
+
+- 파일 전송 (개별적)
+
+  바디 구조
+
+  int uid;
+
+  char uri[1024]; // original path uri: file://...
+
+  int ftime; // modify
+
+  int size;
+
+  char * data;
+
+* 
+....................................................................................................................................................
+
+* PKT_HEADER
+
+  int foot_print[16];
+  int wid;  // doc id
+  int uid;  // user id - login 인 경우 0
+  int fid;  // 파일인 경우 파일 id > 0 아니면 0
+  int chain;
+  
+* data packet
+
+  int chain;
+  int length; // 양수이면 중간 음수이면 끝.
+  char * data;
+  
+* type 이 file 이면 수신자가 pkt 전송치를 삭제. 아니면 전송후 소멸
+
+* 레코드중 파일 uri 를 포함한 문자열이 있다면 이를 파일 id 로 바꾸고 DB 에 보존 
+
+  - 기존에 저장된 파일 URI 가 있다면(파일크기, 생성일, 변경일정보등이 일치한다면) 그 id 를 가져옴.
+  
+  - 기존에 있지만 변경된 것이면 역시 그 id 를 가져옴
+  
+* 생성된 파일 id 인 경우 전송하여 수신자 파일 DB 반영
+
+* 수정된 파일 id 인 경우 전송하여 수신자 파일 DB 수정
+
+* 그후 데이터 전송 - 수신자는 데이터내의 file_id:\\??? 를 변경함. 

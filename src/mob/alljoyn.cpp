@@ -91,7 +91,7 @@ class ChatObject : public BusObject {
         }
 		printf("SendChatSignal: %s\n", chatSignalMember->name.c_str());
 		
-        return Signal(NULL, s_sessionId, *chatSignalMember, &chatArg, 1, 0, flags);
+        return Signal(NULL, s_sessionId, *chatSignalMember, &chatArg, 1, 0, flags); 
     }
 
     /** Receive a signal from another Chat client */
@@ -194,7 +194,7 @@ class MyBusListener : public BusListener, public SessionPortListener, public Ses
         }
     }
 	virtual void SessionMemberAdded(SessionId sessionId, const char* uniqueName) {
-		printf("SessionMemberAdded with %s (id=%d)\n", uniqueName, sessionId);
+		printf("SessionMemberAdded with %s (id=%d)\nsqlite> ", uniqueName, sessionId);
 	}
 
 	/**
@@ -204,7 +204,7 @@ class MyBusListener : public BusListener, public SessionPortListener, public Ses
 	* @param uniqueName    Unique name of member who was removed.
 	*/
 	virtual void SessionMemberRemoved(SessionId sessionId, const char* uniqueName) {
-		printf("SessionMemberRemoved with %s (id=%d)\n", uniqueName, sessionId);
+		printf("SessionMemberRemoved with %s (id=%d)\nsqlite> ", uniqueName, sessionId);
 	}
 };
 
@@ -226,6 +226,9 @@ static void Usage()
 /** Parse the the command line arguments. If a problem occurs exit via Usage(). */
 static void ParseCommandLine(int argc, char** argv)
 {
+	//s_advertisedName = NAME_PREFIX;
+	//s_advertisedName += "test";
+	//return;
 	/* Parse command line args */
     for (int i = 1; i < argc; ++i) {
         if (0 == ::strcmp("-s", argv[i])) {

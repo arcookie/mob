@@ -37,7 +37,7 @@ extern "C" {
 	*/
 	int strPrintf(Str *p, const char *zFormat, ...);
 
-	void get_diff(sqlite3 * pDB, const char * zBackDB, Str * redo, Str * undo);
+	void get_diff(sqlite3 * pDB, const char * zBackDB, Str * base, Str * redo, Str * undo);
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */
