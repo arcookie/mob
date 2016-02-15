@@ -27,7 +27,37 @@
 #include <cstdio>
 #include <cstdlib>
 #include <signal.h>
+#include <time.h>
+#include <vector>
 #include "mob_alljoyn.h"
+
+#define SEND_BUF		(8192 - sizeof(int) * 2)
+
+#define ACT_DATA		0
+#define ACT_FLIST		1
+#define ACT_FLIST_REQ	2
+#define ACT_FILE		3
+
+#define TRAIN_MARK_1	0x34533454
+#define TRAIN_MARK_2	0x34531454
+#define TRAIN_MARK_3	0x32533454
+#define TRAIN_MARK_4	0x34533054
+#define TRAIN_MARK_5	0x54531454
+#define TRAIN_MARK_6	0x32533414
+#define TRAIN_MARK_END	6
+
+#define TRAIN_HEADER(a)	int __o__[TRAIN_MARK_END] = {TRAIN_MARK_1,TRAIN_MARK_2,TRAIN_MARK_3,TRAIN_MARK_4,TRAIN_MARK_5,TRAIN_MARK_6,}; memcpy((char *)(a), (char *)__o__, sizeof(__o__));
+
+#define IS_TRAIN_HEADER(a)	\
+	(((int*)a)[0] == TRAIN_MARK_1 && ((int*)a)[1] == TRAIN_MARK_2 && ((int*)a)[2] == TRAIN_MARK_3 && \
+	((int*)a)[3] == TRAIN_MARK_4 && ((int*)a)[4] == TRAIN_MARK_5 && ((int*)a)[5] == TRAIN_MARK_6)
+
+typedef struct {
+	int marks[TRAIN_MARK_END];
+	int wid;  // doc id
+	int action; // 0 data, 1 file list 2 file list req 3 file
+	int chain;
+} TRAIN_HEADER;
 
 using namespace ajn;
 
@@ -46,6 +76,9 @@ static qcc::String s_sessionHost;
 static SessionId s_sessionId = 0;
 static bool s_joinComplete = false;
 static volatile sig_atomic_t s_interrupt = false;
+static int s_doc_id = 0;
+static int s_user_id = 0;
+static qcc::String s_user_password;
 
 void CDECL_CALL SigIntHandler(int sig)
 {
@@ -81,17 +114,57 @@ class ChatObject : public BusObject {
         }
     }
 
-    /** Send a Chat signal */
-    QStatus SendChatSignal(const char* msg) {
+	QStatus SendData(int nChain, const char * pData, int nLength) {
+		QStatus status = ER_FAIL;
+		int l = nLength + sizeof(int) * 2;
+		char * pBuf = new char[l];
 
-        MsgArg chatArg("ay", strlen(msg), msg);
-        uint8_t flags = 0;
-        if (0 == s_sessionId) {
-            printf("Sending Chat signal without a session id\n");
-        }
-		printf("SendChatSignal: %s\n", chatSignalMember->name.c_str());
-		
-        return Signal(NULL, s_sessionId, *chatSignalMember, &chatArg, 1, 0, flags); 
+		if (pBuf) {
+			((int*)pBuf)[0] = nChain;
+			((int*)pBuf)[1] = nLength;
+			memcpy(pBuf + sizeof(int) * 2, pData, nLength);
+
+			uint8_t flags = 0;
+			MsgArg chatArg("ay", l, pBuf);
+
+			status = Signal(NULL, s_sessionId, *chatSignalMember, &chatArg, 1, 0, flags);
+
+			delete[] pBuf;
+		}
+
+		return status;
+	}
+
+    /** Send a Chat signal */
+    QStatus SendChatSignal(int wid, const char * msg) {
+		TRAIN_HEADER th;
+		int len = strlen(msg);
+		uint8_t flags = 0;
+
+		TRAIN_HEADER(th.marks);
+
+		th.wid = wid;
+		th.action = ACT_DATA;
+		th.chain = time(NULL);
+
+		QStatus status;
+		MsgArg chatArg("ay", sizeof(TRAIN_HEADER), &th);
+
+		if ((status = Signal(NULL, s_sessionId, *chatSignalMember, &chatArg, 1, 0, flags)) == ER_OK && len > 0) {
+			int l = len > SEND_BUF ? SEND_BUF : len;
+			const char * p = msg;
+
+			while ((status = SendData(th.chain, p, l)) == ER_OK) {
+				if (len > SEND_BUF) {
+					len -= SEND_BUF;
+					p += SEND_BUF;
+					l = len > SEND_BUF ? SEND_BUF : len;
+				}
+				else break;
+			}
+		}
+
+		return status;
     }
 
     /** Receive a signal from another Chat client */
@@ -223,27 +296,55 @@ static void Usage()
     exit(EXIT_FAILURE);
 }
 
+BOOL asVector(LPCTSTR sText, LPCTSTR cDelimit, std::vector<std::string> & stlRes)
+{
+	stlRes.clear();
+
+	char *nexttoken = NULL;
+	char *text = _strdup(sText);
+	char *token = strtok_s(text, cDelimit, &nexttoken);
+
+	while (token != NULL) {
+		if (strlen(token) > 0) stlRes.push_back(token);
+		token = strtok_s(NULL, cDelimit, &nexttoken);
+	}
+
+	free(text);
+
+	return !stlRes.empty();
+}
+
 /** Parse the the command line arguments. If a problem occurs exit via Usage(). */
 static void ParseCommandLine(int argc, char** argv)
 {
-	//s_advertisedName = NAME_PREFIX;
-	//s_advertisedName += "test";
-	//return;
+	std::vector<std::string> v;
+
 	/* Parse command line args */
     for (int i = 1; i < argc; ++i) {
         if (0 == ::strcmp("-s", argv[i])) {
             if ((++i < argc) && (argv[i][0] != '-')) {
-                s_advertisedName = NAME_PREFIX;
-                s_advertisedName += argv[i];
+				if (asVector(argv[i], ":", v)) {
+					s_advertisedName = NAME_PREFIX;
+					s_advertisedName += v[0].data();
+					s_doc_id = atoi(v[1].data());
+					s_user_id = atoi(v[2].data());
+					s_user_password = atoi(v[3].data());
+				}
             } else {
                 printf("Missing parameter for \"-s\" option\n");
                 Usage();
             }
         } else if (0 == ::strcmp("-j", argv[i])) {
             if ((++i < argc) && (argv[i][0] != '-')) {
-                s_joinName = NAME_PREFIX;
-                s_joinName += argv[i];
-            } else {
+				if (asVector(argv[i], ":", v)) {
+					s_joinName = NAME_PREFIX;
+					s_joinName += v[0].data();
+					s_doc_id = atoi(v[1].data());
+					s_user_id = atoi(v[2].data());
+					s_user_password = atoi(v[3].data());
+				}
+			}
+			else {
                 printf("Missing parameter for \"-j\" option\n");
                 Usage();
             }
@@ -514,14 +615,34 @@ void alljoyn_disconnect(void)
 	AllJoynShutdown();
 }
 
-int alljoyn_send(const char * sText)
+int alljoyn_send(int nDocID, const char * sText)
 {
-	return (QStatus)s_chatObj->SendChatSignal(sText);
+	return (QStatus)s_chatObj->SendChatSignal(nDocID, sText);
 }
 
 void alljoyn_set_handler(fnSendHandler fnProc)
 {
 	gSendHandler = fnProc;
+}
+
+int alljoyn_doc_id()
+{
+	return s_doc_id;
+}
+
+int alljoyn_user_id()
+{
+	return s_doc_id;
+}
+
+const char * alljoyn_user_password()
+{
+	return s_user_password.c_str();
+}
+
+int alljoyn_is_server()
+{
+	return s_advertisedName.empty() ? 0 : 1;
 }
 
 #ifdef __cplusplus

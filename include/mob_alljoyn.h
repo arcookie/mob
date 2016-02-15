@@ -15,7 +15,13 @@ extern "C" {
 	void alljoyn_disconnect(void);
 	int alljoyn_connect(int argc, char** argv);
 
-	int alljoyn_send(const char * sText);
+	int alljoyn_send(int nDocID, const char * sText);
+
+	int alljoyn_is_server();
+
+	int alljoyn_doc_id();
+	int alljoyn_user_id();
+	const char * alljoyn_user_password();
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */
