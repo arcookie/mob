@@ -15,7 +15,7 @@ extern "C" {
 	void alljoyn_disconnect(void);
 	int alljoyn_connect(int argc, char** argv);
 
-	int alljoyn_send(int nDocID, const char * sText);
+	int alljoyn_send(int nDocID, const char * sText, int nLength);
 
 	int alljoyn_is_server();
 

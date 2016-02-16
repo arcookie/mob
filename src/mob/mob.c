@@ -147,7 +147,7 @@ int mob_sync_db(sqlite3 * pDb, int send)
 			break;
 		);
 
-		if (send && wid > 0) alljoyn_send(wid, redo.z);
+		if (send && wid > 0) alljoyn_send(wid, redo.z, redo.nUsed);
 	}
 
 	strFree(&sql);

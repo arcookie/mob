@@ -66,7 +66,7 @@ static const char* CHAT_SERVICE_INTERFACE_NAME = "org.alljoyn.bus.samples.chat";
 static const char* NAME_PREFIX = "org.alljoyn.bus.samples.chat.";
 static const char* CHAT_SERVICE_OBJECT_PATH = "/chatService";
 static const SessionPort CHAT_PORT = 27;
-static fnSendHandler gSendHandler = NULL;
+static fnSendHandler fnRecvData = NULL;
 
 /* static data. */
 static ajn::BusAttachment* s_bus = NULL;
@@ -105,7 +105,7 @@ class ChatObject : public BusObject {
 
         /* Register signal handler */
         status =  bus.RegisterSignalHandler(this,
-                                            static_cast<MessageReceiver::SignalHandler>(&ChatObject::ChatSignalHandler),
+                                            static_cast<MessageReceiver::SignalHandler>(&ChatObject::OnRecvData),
                                             chatSignalMember,
                                             NULL);
 
@@ -114,7 +114,21 @@ class ChatObject : public BusObject {
         }
     }
 
-	QStatus SendData(int nChain, const char * pData, int nLength) {
+	/** Send a Chat signal */
+	QStatus SendFList(int wid, const char * msg, int nLength) {
+		QStatus status = ER_OK;
+		const char * p = msg;
+		const char * p2;
+
+		// ' inside of file:// most be urlencoded.
+		while ((p = strstr(p, "file://")) != NULL && (p2 = strchr(p, '\'')) != NULL) {
+			p = p2 + 1;
+		}
+
+		return status;
+	}
+
+	QStatus _Send(int nChain, const char * pData, int nLength) {
 		QStatus status = ER_FAIL;
 		int l = nLength + sizeof(int) * 2;
 		char * pBuf = new char[l];
@@ -136,9 +150,8 @@ class ChatObject : public BusObject {
 	}
 
     /** Send a Chat signal */
-    QStatus SendChatSignal(int wid, const char * msg) {
+    QStatus SendData(int wid, const char * msg, int nLength) {
 		TRAIN_HEADER th;
-		int len = strlen(msg);
 		uint8_t flags = 0;
 
 		TRAIN_HEADER(th.marks);
@@ -150,15 +163,15 @@ class ChatObject : public BusObject {
 		QStatus status;
 		MsgArg chatArg("ay", sizeof(TRAIN_HEADER), &th);
 
-		if ((status = Signal(NULL, s_sessionId, *chatSignalMember, &chatArg, 1, 0, flags)) == ER_OK && len > 0) {
-			int l = len > SEND_BUF ? SEND_BUF : len;
+		if ((status = Signal(NULL, s_sessionId, *chatSignalMember, &chatArg, 1, 0, flags)) == ER_OK && nLength > 0) {
+			int l = nLength > SEND_BUF ? SEND_BUF : nLength;
 			const char * p = msg;
 
-			while ((status = SendData(th.chain, p, l)) == ER_OK) {
-				if (len > SEND_BUF) {
-					len -= SEND_BUF;
+			while ((status = _Send(th.chain, p, l)) == ER_OK) {
+				if (nLength > SEND_BUF) {
+					nLength -= SEND_BUF;
 					p += SEND_BUF;
-					l = len > SEND_BUF ? SEND_BUF : len;
+					l = nLength > SEND_BUF ? SEND_BUF : nLength;
 				}
 				else break;
 			}
@@ -168,17 +181,17 @@ class ChatObject : public BusObject {
     }
 
     /** Receive a signal from another Chat client */
-    void ChatSignalHandler(const InterfaceDescription::Member* member, const char* srcPath, Message& msg)
+    void OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg)
     {
         QCC_UNUSED(member);
         QCC_UNUSED(srcPath);
 
-		if (gSendHandler) {
+		if (fnRecvData) {
 			uint8_t * data;
 			size_t size;
 
 			msg->GetArg(0)->Get("ay", &size, &data);
-			gSendHandler((const char *)data, size);
+			fnRecvData((const char *)data, size);
 			printf("%s:(%d) %ssqlite>", msg->GetSender(), size, (const char *)data);
 		}
     }
@@ -615,14 +628,18 @@ void alljoyn_disconnect(void)
 	AllJoynShutdown();
 }
 
-int alljoyn_send(int nDocID, const char * sText)
+int alljoyn_send(int nDocID, const char * sText, int nLength)
 {
-	return (QStatus)s_chatObj->SendChatSignal(nDocID, sText);
+	QStatus status = s_chatObj->SendData(nDocID, sText, nLength);
+
+	if (status == ER_OK) status = s_chatObj->SendFList(nDocID, sText, nLength);
+
+	return status;
 }
 
 void alljoyn_set_handler(fnSendHandler fnProc)
 {
-	gSendHandler = fnProc;
+	fnRecvData = fnProc;
 }
 
 int alljoyn_doc_id()
