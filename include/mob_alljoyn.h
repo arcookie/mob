@@ -2,6 +2,11 @@
 #ifndef _MOB_ALLJOYN_H_
 #define _MOB_ALLJOYN_H_
 
+#define ACT_DATA		0
+#define ACT_FLIST		1
+#define ACT_FLIST_REQ	2
+#define ACT_FILE		3
+
 /*
 ** Make sure we can call this stuff from C++.
 */
@@ -15,7 +20,7 @@ extern "C" {
 	void alljoyn_disconnect(void);
 	int alljoyn_connect(int argc, char** argv);
 
-	int alljoyn_send(int nDocID, const char * sText, int nLength);
+	int alljoyn_send(int nAction, int nDocID, const char * sText, int nLength);
 
 	int alljoyn_is_server();
 

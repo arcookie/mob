@@ -33,11 +33,6 @@
 
 #define SEND_BUF		(8192 - sizeof(int) * 2)
 
-#define ACT_DATA		0
-#define ACT_FLIST		1
-#define ACT_FLIST_REQ	2
-#define ACT_FILE		3
-
 #define TRAIN_MARK_1	0x34533454
 #define TRAIN_MARK_2	0x34531454
 #define TRAIN_MARK_3	0x32533454
@@ -114,20 +109,6 @@ class ChatObject : public BusObject {
         }
     }
 
-	/** Send a Chat signal */
-	QStatus SendFList(int wid, const char * msg, int nLength) {
-		QStatus status = ER_OK;
-		const char * p = msg;
-		const char * p2;
-
-		// ' inside of file:// most be urlencoded.
-		while ((p = strstr(p, "file://")) != NULL && (p2 = strchr(p, '\'')) != NULL) {
-			p = p2 + 1;
-		}
-
-		return status;
-	}
-
 	QStatus _Send(int nChain, const char * pData, int nLength) {
 		QStatus status = ER_FAIL;
 		int l = nLength + sizeof(int) * 2;
@@ -150,14 +131,14 @@ class ChatObject : public BusObject {
 	}
 
     /** Send a Chat signal */
-    QStatus SendData(int wid, const char * msg, int nLength) {
+	QStatus SendData(int nAction, int wid, const char * msg, int nLength) {
 		TRAIN_HEADER th;
 		uint8_t flags = 0;
 
 		TRAIN_HEADER(th.marks);
 
 		th.wid = wid;
-		th.action = ACT_DATA;
+		th.action = nAction;
 		th.chain = time(NULL);
 
 		QStatus status;
@@ -628,13 +609,9 @@ void alljoyn_disconnect(void)
 	AllJoynShutdown();
 }
 
-int alljoyn_send(int nDocID, const char * sText, int nLength)
+int alljoyn_send(int nAction, int nDocID, const char * sText, int nLength)
 {
-	QStatus status = s_chatObj->SendData(nDocID, sText, nLength);
-
-	if (status == ER_OK) status = s_chatObj->SendFList(nDocID, sText, nLength);
-
-	return status;
+	return s_chatObj->SendData(nAction, nDocID, sText, nLength);
 }
 
 void alljoyn_set_handler(fnSendHandler fnProc)
