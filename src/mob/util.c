@@ -52,3 +52,23 @@ int strPrintf(Str *p, const char *zFormat, ...)
 	return !!p->z;
 }
 
+
+char * get_file_path(const char * path)
+{
+	return 0;
+}
+
+int get_file_mtime(const char * path)
+{
+	return 0;
+}
+
+long long get_file_length(const char * path)
+{
+	return 0L;
+}
+
+int catmem(char ** data, void * fsi, int len)
+{
+	return 0;
+}

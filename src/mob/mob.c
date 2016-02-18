@@ -106,7 +106,7 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 				sqlite3_exec(pMobDb, 
 					"CREATE TABLE member (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, key CHAR(32), pwd CHAR(32), connected BOOL DEFAULT 0);"
 					"CREATE TABLE received (uid INTEGER, snum INTEGER, region VARCHAR(1024), data TEXT, CONSTRAINT[] PRIMARY KEY(uid, snum));"
-					"CREATE TABLE files (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 0, sent BOOL default 0, uid INTEGER, mtime TIMESTAMP, size INT64, uri VARCHAR(1024), path VARCHAR(1024));"
+					"CREATE TABLE files (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 0, sent BOOL default 0, mtime TIMESTAMP, size INT64, uri VARCHAR(1024), path VARCHAR(1024));"
 					"PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 				if (alljoyn_is_server() == 1) sqlite3_exec(pMobDb, "INSERT INTO member (pwd) VALUES ('-');INSERT INTO member (pwd) VALUES ('12345678');", 0, 0, 0);
 			}
@@ -119,16 +119,6 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 		return nRet;
 	}
 	return SQLITE_ERROR;
-}
-
-int get_file_mtime(const char * path)
-{
-	return 0;
-}
-
-long long get_file_length(const char * path)
-{
-	return 0L;
 }
 
 int mob_sync_db(sqlite3 * pDb, int send)
@@ -161,37 +151,7 @@ int mob_sync_db(sqlite3 * pDb, int send)
 		);
 
 		if (pMobDb && send && wid > 0) {
-			alljoyn_send(ACT_DATA, wid, redo.z, redo.nUsed);
-
-			int skip;
-			int flist = 0;
-			char * p = redo.z;
-			char * p2;
-
-			// ' inside of file:// most be urlencoded.
-			while ((p = strstr(p, "file://")) != NULL) {
-				p += 7;
-				if ((p2 = strchr(p, '\'')) != NULL && p2 > p) {
-					skip = 0;
-					*p2 = 0;
-					QUERY_SQL_V(pMobDb, pStmt, ("SELECT path, mtime, size FROM files WHERE uri=%Q AND sent=1", p),
-						char * path = sqlite3_column_text(pStmt, 0);
-
-						if (get_file_mtime(path) == sqlite3_column_int(pStmt, 1) && get_file_length(path) == sqlite3_column_int64(pStmt, 2)) skip = 1;
-
-						break;
-					);
-
-					if (skip == 0) {
-						EXECUTE_SQL_V(pMobDb, ("INSERT INTO files (uid, uri, path, mtime, size) VALUES (%d, %Q, %Q, %d, %ld)", alljoyn_user_id(), p + 7, p + 7, get_file_mtime(p), get_file_length(p)));
-						flist = 1;
-					}
-					p = p2 + 1;
-				}
-				else p++;
-			}
-
-			if (flist == 1)	alljoyn_send(ACT_FLIST, wid, redo.z, redo.nUsed);
+			alljoyn_send(wid, redo.z, redo.nUsed);
 		}
 	}
 
@@ -234,3 +194,47 @@ int mob_close_db(sqlite3 * pDb)
 	return sqlite3_close(pDb);
 }
 
+/*
+
+len = p2 - p;
+if (len < 1024)	{
+memcpy(fi.uri, p, len);
+fi.mtime = get_file_mtime(p);
+fi.fsize = get_file_length(p);
+
+add2mem(data, &fi, sizeof(FILE_SEND_ITEM));
+total += sizeof(FILE_SEND_ITEM);
+}
+
+QUERY_SQL_V(pMobDb, pStmt, ("SELECT mtime, size FROM files WHERE path=%Q AND sent=1", path),
+if (mtime == sqlite3_column_int(pStmt, 0) && fsize == sqlite3_column_int64(pStmt, 1)) skip = 1;
+break;
+);
+
+if (skip == 0) EXECUTE_SQL_V(pMobDb, ("INSERT INTO files (uri, path, mtime, size) VALUES (%Q, %Q, %d, %ld)", p, path, mtime, fsize));
+*/
+
+
+/*
+
+if (total > 0) alljoyn_send(ACT_FLIST, wid, data, total);
+
+char ** table = 0;
+int rows = 0, cols = 0;
+
+if (sqlite3_get_table(pMobDb, "SELECT uri, mtime, size FROM files WHERE sent=0", &table, &rows, &cols, 0) == SQLITE_OK) {
+int r = 0, c;
+
+while (++r <= rows) {
+c = -1;
+while (++c < cols) {
+//s = table[r * cols + c];
+}
+}
+
+alljoyn_send(ACT_FLIST, wid, table, redo.nUsed);
+sqlite3_exec(pMobDb, "UPDATE sent=1 WHERE sent=0", 0, 0, 0);
+}
+
+if (table) sqlite3_free_table(table);
+*/

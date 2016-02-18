@@ -29,6 +29,7 @@
 #include <signal.h>
 #include <time.h>
 #include <vector>
+#include "util.h"
 #include "mob_alljoyn.h"
 
 #define SEND_BUF		(8192 - sizeof(int) * 2)
@@ -53,6 +54,13 @@ typedef struct {
 	int action; // 0 data, 1 file list 2 file list req 3 file
 	int chain;
 } TRAIN_HEADER;
+
+typedef struct {
+	char uri[MAX_URI];
+	int mtime;
+	long long fsize;
+
+} FILE_SEND_ITEM;
 
 using namespace ajn;
 
@@ -110,16 +118,17 @@ class ChatObject : public BusObject {
     }
 
 	QStatus _Send(int nChain, const char * pData, int nLength) {
+		uint8_t flags = 0;
 		QStatus status = ER_FAIL;
-		int l = nLength + sizeof(int) * 2;
+		int l = (nLength > 0 ? nLength : 0) + sizeof(int)* 2;
 		char * pBuf = new char[l];
 
 		if (pBuf) {
 			((int*)pBuf)[0] = nChain;
 			((int*)pBuf)[1] = nLength;
-			memcpy(pBuf + sizeof(int) * 2, pData, nLength);
 
-			uint8_t flags = 0;
+			if (nLength > 0) memcpy(pBuf + sizeof(int)* 2, pData, nLength);
+
 			MsgArg chatArg("ay", l, pBuf);
 
 			status = Signal(NULL, s_sessionId, *chatSignalMember, &chatArg, 1, 0, flags);
@@ -156,6 +165,7 @@ class ChatObject : public BusObject {
 				}
 				else break;
 			}
+			_Send(th.chain, 0, -1);
 		}
 
 		return status;
@@ -609,9 +619,38 @@ void alljoyn_disconnect(void)
 	AllJoynShutdown();
 }
 
-int alljoyn_send(int nAction, int nDocID, const char * sText, int nLength)
+int alljoyn_send(int nDocID, char * sText, int nLength)
 {
-	return s_chatObj->SendData(nAction, nDocID, sText, nLength);
+	int ret = s_chatObj->SendData(ACT_DATA, nDocID, sText, nLength);
+
+	if (ER_OK == ret) {
+		int len = 0;
+		char * p = sText;
+		char * data = 0;
+		char * p2;
+		FILE_SEND_ITEM fsi;
+
+		// ' inside of file:// most be urlencoded.
+		while ((p = strstr(p, "file://")) != NULL) {
+			p += 7;
+			if ((p2 = strchr(p, '\'')) != NULL && p2 > p) {
+				*p2 = 0;
+				if (p2 - p < MAX_URI)	{
+					memcpy(fsi.uri, p, p2 - p);
+					fsi.mtime = get_file_mtime(p);
+					fsi.fsize = get_file_length(p);
+
+					if (catmem(&data, &fsi, sizeof(FILE_SEND_ITEM)) == sizeof(FILE_SEND_ITEM)) len += sizeof(FILE_SEND_ITEM);
+				}
+
+				p = p2 + 1;
+			}
+			else p++;
+		}
+		if (len > 0) ret = s_chatObj->SendData(ACT_FLIST, nDocID, data, len);
+	}
+
+	return ret;
 }
 
 void alljoyn_set_handler(fnSendHandler fnProc)
