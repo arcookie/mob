@@ -29,6 +29,7 @@
 #include <signal.h>
 #include <time.h>
 #include <vector>
+#include <map>
 #include "util.h"
 #include "mob_alljoyn.h"
 
@@ -50,10 +51,28 @@
 
 typedef struct {
 	int marks[TRAIN_MARK_END];
+	int aid;  // action id
 	int wid;  // doc id
 	int action; // 0 data, 1 file list 2 file list req 3 file
 	int chain;
 } TRAIN_HEADER;
+
+class TRAIN {
+public:
+	TRAIN() {
+		length = 0;
+		body = NULL;
+	}
+	~TRAIN() {
+		if (body) delete body;
+	}
+
+	int aid;  // action id
+	int wid;  // doc id
+	int action; // 0 data, 1 file list 2 file list req 3 file
+	int length;
+	char * body;
+};
 
 typedef struct {
 	char uri[MAX_URI];
@@ -120,14 +139,14 @@ class ChatObject : public BusObject {
 	QStatus _Send(int nChain, const char * pData, int nLength) {
 		uint8_t flags = 0;
 		QStatus status = ER_FAIL;
-		int l = (nLength > 0 ? nLength : 0) + sizeof(int)* 2;
+		int l = (nLength > 0 ? nLength : 0) + sizeof(int);
 		char * pBuf = new char[l];
 
 		if (pBuf) {
 			((int*)pBuf)[0] = nChain;
 			((int*)pBuf)[1] = nLength;
 
-			if (nLength > 0) memcpy(pBuf + sizeof(int)* 2, pData, nLength);
+			if (nLength > 0) memcpy(pBuf + sizeof(int), pData, nLength);
 
 			MsgArg chatArg("ay", l, pBuf);
 
@@ -140,15 +159,17 @@ class ChatObject : public BusObject {
 	}
 
     /** Send a Chat signal */
-	QStatus SendData(int nAction, int wid, const char * msg, int nLength) {
+	QStatus SendData(int nAID, int nAction, int wid, const char * msg, int nLength) {
 		TRAIN_HEADER th;
 		uint8_t flags = 0;
 
 		TRAIN_HEADER(th.marks);
 
+		th.aid = nAID;
 		th.wid = wid;
 		th.action = nAction;
 		th.chain = time(NULL);
+		th.chain |= s_user_id; // indivisualize using by user id
 
 		QStatus status;
 		MsgArg chatArg("ay", sizeof(TRAIN_HEADER), &th);
@@ -180,10 +201,84 @@ class ChatObject : public BusObject {
 		if (fnRecvData) {
 			uint8_t * data;
 			size_t size;
+			std::map<int, TRAIN>::iterator iter;
 
 			msg->GetArg(0)->Get("ay", &size, &data);
-			fnRecvData((const char *)data, size);
-			printf("%s:(%d) %ssqlite>", msg->GetSender(), size, (const char *)data);
+
+			if (IS_TRAIN_HEADER(data) && size == sizeof(TRAIN_HEADER)) {
+				TRAIN_HEADER * pTH = (TRAIN_HEADER *)data;
+
+				m_mTrain[pTH->chain].action = pTH->action;
+				m_mTrain[pTH->chain].aid = pTH->aid;
+				m_mTrain[pTH->chain].wid = pTH->wid;
+			}
+			else if ((iter = m_mTrain.find(((int*)data)[0])) != m_mTrain.end()){
+				if (size == sizeof(int)) {
+					switch (iter->second.action) {
+					case ACT_DATA:
+						printf("%s:(%d) %ssqlite>", msg->GetSender(), iter->second.length, iter->second.body);
+						m_mHangar[iter->second.aid].action = iter->second.action;
+						m_mHangar[iter->second.aid].wid = iter->second.wid;
+						memcpy(m_mHangar[iter->second.aid].body, iter->second.body, iter->second.length);
+						m_mHangar[iter->second.aid].length = iter->second.length;
+						// 
+						break;
+					case ACT_FLIST:
+						if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
+							int n = 0, len=0;
+							char * data = 0;
+							FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body;
+
+							while (n < iter->second.length) {
+//								find pFSI->uri and cpy
+
+								if (catmem(&data, pFSI, sizeof(FILE_SEND_ITEM)) == sizeof(FILE_SEND_ITEM)) len += sizeof(FILE_SEND_ITEM);
+
+								n += sizeof(FILE_SEND_ITEM);
+								pFSI++;
+							}
+							if (len > 0) SendData(iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data, len);
+						}
+						break;
+					case ACT_FLIST_REQ:
+						if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
+							int n = 0;
+							FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body;
+
+							while (n < iter->second.length) {
+								// load pFSI->uri as mem
+								char * fmem = 0;
+								int fsize = 0;
+								SendData(iter->second.aid, ACT_FILE, iter->second.wid, fmem, fsize);
+								n += sizeof(FILE_SEND_ITEM);
+								pFSI++;
+							}
+							SendData(iter->second.aid, ACT_END, iter->second.wid, 0, 0);
+						}
+						break;
+					case ACT_FILE:
+						// save as file of data and register in file list table(or map).
+						break;
+					case ACT_END:
+						{
+							std::map<int, TRAIN>::iterator _iter;
+
+							if ((_iter = m_mHangar.find(iter->second.aid)) != m_mHangar.end()){
+								// file:// 를 테이블을 이용하여 변환하여 DB 에 반영
+								// apply 하고 머지후 전달할것.
+								fnRecvData(_iter->second.wid, _iter->second.body, _iter->second.length);
+								m_mHangar.erase(_iter);
+							}
+						}
+						break;
+					}
+					m_mTrain.erase(iter);
+				}
+				else {
+					catmem(&(iter->second.body), (void *)(((int*)data) + 1), size - sizeof(int));
+					iter->second.length += size - sizeof(int);
+				}
+			}
 		}
     }
 
@@ -200,7 +295,9 @@ class ChatObject : public BusObject {
 	}
 
   private:
-    const InterfaceDescription::Member* chatSignalMember;
+	  std::map<int, TRAIN>			m_mTrain;
+	  std::map<int, TRAIN>			m_mHangar;
+	  const InterfaceDescription::Member* chatSignalMember;
 };
 
 class MyBusListener : public BusListener, public SessionPortListener, public SessionListener {
@@ -621,10 +718,11 @@ void alljoyn_disconnect(void)
 
 int alljoyn_send(int nDocID, char * sText, int nLength)
 {
-	int ret = s_chatObj->SendData(ACT_DATA, nDocID, sText, nLength);
+	int aid = time(NULL);
+	int ret = s_chatObj->SendData(aid, ACT_DATA, nDocID, sText, nLength);
 
 	if (ER_OK == ret) {
-		int len = 0;
+		int len = 0, l;
 		char * p = sText;
 		char * data = 0;
 		char * p2;
@@ -633,12 +731,12 @@ int alljoyn_send(int nDocID, char * sText, int nLength)
 		// ' inside of file:// most be urlencoded.
 		while ((p = strstr(p, "file://")) != NULL) {
 			p += 7;
-			if ((p2 = strchr(p, '\'')) != NULL && p2 > p) {
-				*p2 = 0;
-				if (p2 - p < MAX_URI)	{
-					memcpy(fsi.uri, p, p2 - p);
-					fsi.mtime = get_file_mtime(p);
-					fsi.fsize = get_file_length(p);
+			if ((p2 = strchr(p, '\'')) != NULL && (l = (p2 - p)) > 0) {
+				if (l < MAX_URI)	{
+					memcpy(fsi.uri, p, l);
+					fsi.uri[l] = 0;
+					fsi.mtime = get_file_mtime(fsi.uri);
+					fsi.fsize = get_file_length(fsi.uri);
 
 					if (catmem(&data, &fsi, sizeof(FILE_SEND_ITEM)) == sizeof(FILE_SEND_ITEM)) len += sizeof(FILE_SEND_ITEM);
 				}
@@ -647,7 +745,7 @@ int alljoyn_send(int nDocID, char * sText, int nLength)
 			}
 			else p++;
 		}
-		if (len > 0) ret = s_chatObj->SendData(ACT_FLIST, nDocID, data, len);
+		if (len > 0) ret = s_chatObj->SendData(aid, ACT_FLIST, nDocID, data, len);
 	}
 
 	return ret;

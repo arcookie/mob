@@ -19,7 +19,7 @@ while (sqlite3_step(__stmt__) == SQLITE_ROW) { __VA_ARGS__ } sqlite3_finalize(__
 sqlite3 * master_db = 0;           /* The database */
 
 
-int SendHandler(const char * sText, int nLength)
+int SendHandler(int nDocID, const char * sText, int nLength)
 {
 	sqlite3_stmt *pStmt = NULL;
 

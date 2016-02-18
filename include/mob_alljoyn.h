@@ -6,6 +6,7 @@
 #define ACT_FLIST		1
 #define ACT_FLIST_REQ	2
 #define ACT_FILE		3
+#define ACT_END			4
 
 /*
 ** Make sure we can call this stuff from C++.
@@ -14,7 +15,7 @@
 extern "C" {
 #endif
 
-	typedef int(*fnSendHandler)(const char * sText, int nLength);
+	typedef int(*fnSendHandler)(int nDocID, const char * sText, int nLength);
 
 	void alljoyn_set_handler(fnSendHandler fnProc);
 	void alljoyn_disconnect(void);
