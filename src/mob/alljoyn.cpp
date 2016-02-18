@@ -237,7 +237,7 @@ class ChatObject : public BusObject {
 								n += sizeof(FILE_SEND_ITEM);
 								pFSI++;
 							}
-							if (len > 0) SendData(iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data, len);
+							if (len > 0) SendData(iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data, len); // special target most be assigned.
 						}
 						break;
 					case ACT_FLIST_REQ:
@@ -249,11 +249,11 @@ class ChatObject : public BusObject {
 								// load pFSI->uri as mem
 								char * fmem = 0;
 								int fsize = 0;
-								SendData(iter->second.aid, ACT_FILE, iter->second.wid, fmem, fsize);
+								SendData(iter->second.aid, ACT_FILE, iter->second.wid, fmem, fsize);// special target most be assigned.
 								n += sizeof(FILE_SEND_ITEM);
 								pFSI++;
 							}
-							SendData(iter->second.aid, ACT_END, iter->second.wid, 0, 0);
+							SendData(iter->second.aid, ACT_END, iter->second.wid, 0, 0);// special target most be assigned.
 						}
 						break;
 					case ACT_FILE:
@@ -732,7 +732,7 @@ int alljoyn_send(int nDocID, char * sText, int nLength)
 		while ((p = strstr(p, "file://")) != NULL) {
 			p += 7;
 			if ((p2 = strchr(p, '\'')) != NULL && (l = (p2 - p)) > 0) {
-				if (l < MAX_URI)	{
+				if (l < MAX_URI) {
 					memcpy(fsi.uri, p, l);
 					fsi.uri[l] = 0;
 					fsi.mtime = get_file_mtime(fsi.uri);
