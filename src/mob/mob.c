@@ -151,11 +151,11 @@ int mob_sync_db(sqlite3 * pDb, int send)
 			wid = sqlite3_column_int(pStmt, 0);
 			sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 1), redo.z, 0, 0, 0);
 
-			EXECUTE_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 2), ("INSERT INTO works (undo, redo) VALUES (%Q, %Q);", undo.z, redo.z));
-
 			pMobDb = (sqlite3 *)sqlite3_column_int64(pStmt, 3);
 			uid_snum = sqlite3_column_int(pStmt, 4);
 			snum = sqlite3_column_int(pStmt, 5);
+
+			EXECUTE_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 2), ("INSERT INTO works (uid, snum, undo, redo) VALUES (%d, %d, %Q, %Q);", uid_snum, snum, undo.z, redo.z));
 
 			EXECUTE_SQL_V(master_db, ("UPDATE works SET uid_snum=uid, snum=snum+1 WHERE ptr_main = %ld;", (long)pDb));
 			break;

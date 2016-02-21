@@ -247,6 +247,7 @@ class ChatObject : public BusObject {
 
 	void FixOmitted(int nDocID)
 	{
+		//
 	}
 
 	const std::string & Save(int nDocID, const char * sText, int nLength, std::string & out)
@@ -304,7 +305,7 @@ class ChatObject : public BusObject {
 				if (size == sizeof(int)) {
 					switch (iter->second.action) {
 					case ACT_OMITTED:
-						// m_vWorks 에서 uid, snum 을 찾아 타킷 발송.
+						// undo DB 에서 uid, snum 을 찾아 타킷 발송.
 						break;
 					case ACT_DATA:
 						printf("%s:(%d) %ssqlite>", msg->GetSender(), iter->second.length, iter->second.body);
@@ -798,8 +799,6 @@ int alljoyn_send(int nDocID, char * sText, int nLength)
 {
 	int aid = time(NULL);
 	int ret = s_chatObj->SendData(aid, ACT_DATA, nDocID, sText, nLength);
-
-	//		m_vWorks.push_back(new WORKS(uid, snum, base, msg));
 
 	if (ER_OK == ret) {
 		int len = 0, l;
