@@ -81,6 +81,21 @@ typedef struct {
 
 } FILE_SEND_ITEM;
 
+class WORKS {
+public:
+	WORKS(int u, int sn, const char * b, const char * d){
+		uid = u;
+		snum = sn;
+		base = b;
+		data = d;
+	}
+
+	int uid;
+	int snum;
+	std::string base;
+	const char * data;
+};
+
 using namespace ajn;
 
 /* constants. */
@@ -106,6 +121,31 @@ void CDECL_CALL SigIntHandler(int sig)
 {
     QCC_UNUSED(sig);
     s_interrupt = true;
+}
+
+BOOL asVector(LPCTSTR sText, int nLength, LPCTSTR cDelimit, std::vector<std::string> & stlRes)
+{
+	stlRes.clear();
+
+	char *nexttoken = NULL;
+	char *text = (char *)malloc(nLength + 1);
+
+	if (text) {
+		memcpy(text, sText, nLength);
+
+		text[nLength] = 0;
+
+		char *token = strtok_s(text, cDelimit, &nexttoken);
+
+		while (token != NULL) {
+			if (strlen(token) > 0) stlRes.push_back(token);
+			token = strtok_s(NULL, cDelimit, &nexttoken);
+		}
+
+		free(text);
+	}
+
+	return !stlRes.empty();
 }
 
 /* Bus object */
@@ -135,6 +175,14 @@ class ChatObject : public BusObject {
             printf("Failed to register signal handler for ChatObject::Chat (%s)\n", QCC_StatusText(status));
         }
     }
+
+	~ChatObject(){
+		std::vector<WORKS *>::iterator iter;
+
+		for (iter = m_vWorks.begin(); iter != m_vWorks.end(); iter++) {
+			delete (*iter);
+		}
+	}
 
 	QStatus _Send(int nChain, const char * pData, int nLength) {
 		uint8_t flags = 0;
@@ -192,6 +240,46 @@ class ChatObject : public BusObject {
 		return status;
     }
 
+	BOOL IsOmitted(int nDocID)
+	{
+		return FALSE;
+	}
+
+	void FixOmitted(int nDocID)
+	{
+	}
+
+	const std::string & Save(int nDocID, const char * sText, int nLength, std::string & out)
+	{
+		const char * s = strstr(sText, "/*|");
+		const char * e;
+
+		if (s) {
+			s += 3;
+			if ((e = strstr(s, "|*/")) != NULL) {
+				std::vector<std::string> v;
+
+				if (asVector(s, e-s, "|", v) && v.size() == 3) {
+					m_vWorks.push_back(new WORKS(atoi(v[0].data()), atoi(v[1].data()), v[2].data(), sText));
+				}
+				// 누락이 있으면 누락 전송용 타이머 시작
+				// 
+				if (IsOmitted(nDocID)) FixOmitted(nDocID);
+			}
+		}
+		std::vector<WORKS *>::iterator iter;
+
+		for (iter = m_vWorks.begin(); iter != m_vWorks.end(); iter++) {
+			out += (*iter)->data;
+		}
+
+		// 충돌이 존재하면 롤백
+
+		// 보냄과 동시에 정리.
+
+		return out;
+	}
+
     /** Receive a signal from another Chat client */
     void OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg)
     {
@@ -215,6 +303,9 @@ class ChatObject : public BusObject {
 			else if ((iter = m_mTrain.find(((int*)data)[0])) != m_mTrain.end()){
 				if (size == sizeof(int)) {
 					switch (iter->second.action) {
+					case ACT_OMITTED:
+						// m_vWorks 에서 uid, snum 을 찾아 타킷 발송.
+						break;
 					case ACT_DATA:
 						printf("%s:(%d) %ssqlite>", msg->GetSender(), iter->second.length, iter->second.body);
 						m_mHangar[iter->second.aid].action = iter->second.action;
@@ -264,9 +355,13 @@ class ChatObject : public BusObject {
 							std::map<int, TRAIN>::iterator _iter;
 
 							if ((_iter = m_mHangar.find(iter->second.aid)) != m_mHangar.end()){
+								std::string s;
+
 								// file:// 를 테이블을 이용하여 변환하여 DB 에 반영
 								// apply 하고 머지후 전달할것.
-								fnRecvData(_iter->second.wid, _iter->second.body, _iter->second.length);
+
+								Save(_iter->second.wid, _iter->second.body, _iter->second.length, s);
+								if (!s.empty()) fnRecvData(_iter->second.wid, s.data());
 								m_mHangar.erase(_iter);
 							}
 						}
@@ -295,6 +390,7 @@ class ChatObject : public BusObject {
 	}
 
   private:
+	  std::vector<WORKS *>			m_vWorks;
 	  std::map<int, TRAIN>			m_mTrain;
 	  std::map<int, TRAIN>			m_mHangar;
 	  const InterfaceDescription::Member* chatSignalMember;
@@ -397,24 +493,6 @@ static void Usage()
     exit(EXIT_FAILURE);
 }
 
-BOOL asVector(LPCTSTR sText, LPCTSTR cDelimit, std::vector<std::string> & stlRes)
-{
-	stlRes.clear();
-
-	char *nexttoken = NULL;
-	char *text = _strdup(sText);
-	char *token = strtok_s(text, cDelimit, &nexttoken);
-
-	while (token != NULL) {
-		if (strlen(token) > 0) stlRes.push_back(token);
-		token = strtok_s(NULL, cDelimit, &nexttoken);
-	}
-
-	free(text);
-
-	return !stlRes.empty();
-}
-
 /** Parse the the command line arguments. If a problem occurs exit via Usage(). */
 static void ParseCommandLine(int argc, char** argv)
 {
@@ -424,7 +502,7 @@ static void ParseCommandLine(int argc, char** argv)
     for (int i = 1; i < argc; ++i) {
         if (0 == ::strcmp("-s", argv[i])) {
             if ((++i < argc) && (argv[i][0] != '-')) {
-				if (asVector(argv[i], ":", v)) {
+				if (asVector(argv[i], strlen(argv[i]), ":", v)) {
 					s_advertisedName = NAME_PREFIX;
 					s_advertisedName += v[0].data();
 					s_doc_id = atoi(v[1].data());
@@ -437,7 +515,7 @@ static void ParseCommandLine(int argc, char** argv)
             }
         } else if (0 == ::strcmp("-j", argv[i])) {
             if ((++i < argc) && (argv[i][0] != '-')) {
-				if (asVector(argv[i], ":", v)) {
+				if (asVector(argv[i], strlen(argv[i]), ":", v)) {
 					s_joinName = NAME_PREFIX;
 					s_joinName += v[0].data();
 					s_doc_id = atoi(v[1].data());
@@ -720,6 +798,8 @@ int alljoyn_send(int nDocID, char * sText, int nLength)
 {
 	int aid = time(NULL);
 	int ret = s_chatObj->SendData(aid, ACT_DATA, nDocID, sText, nLength);
+
+	//		m_vWorks.push_back(new WORKS(uid, snum, base, msg));
 
 	if (ER_OK == ret) {
 		int len = 0, l;

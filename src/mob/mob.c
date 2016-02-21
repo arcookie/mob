@@ -19,7 +19,7 @@ while (sqlite3_step(__stmt__) == SQLITE_ROW) { __VA_ARGS__ } sqlite3_finalize(__
 sqlite3 * master_db = 0;           /* The database */
 
 
-int SendHandler(int nDocID, const char * sText, int nLength)
+int SendHandler(int nDocID, const char * sText)
 {
 	sqlite3_stmt *pStmt = NULL;
 	int uid_snum;
@@ -29,7 +29,7 @@ int SendHandler(int nDocID, const char * sText, int nLength)
 	// 없으면 삭제 가능한 위치로 전송 
 	// 누락이 없으면 순서대로 바로 소진(data 는 테이블에 남지 않는다.)
 
-	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main FROM works WHERE num=%d", alljoyn_doc_id()),
+	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main FROM works WHERE num=%d", nDocID),
 		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), sText, 0, 0, 0);
 		mob_sync_db((sqlite3 *)sqlite3_column_int64(pStmt, 0), 0);
 		break;
