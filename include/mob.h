@@ -11,12 +11,12 @@
 extern "C" {
 #endif
 
-	int mob_init(int argc, char** argv);
 	void mob_exit(void);
-
-	int mob_sync_db(sqlite3 * pDb, int send);
 	int mob_close_db(sqlite3 * pDb);
+	int mob_init(int argc, char** argv);
+	int mob_sync_db(sqlite3 * pDb, int send, int uid, int snum);
 	int mob_open_db(const char *zFilename, sqlite3 **ppDb);
+	int mob_apply(int wid, int uid, int snum, const char * sql);
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */

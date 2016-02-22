@@ -19,19 +19,16 @@ while (sqlite3_step(__stmt__) == SQLITE_ROW) { __VA_ARGS__ } sqlite3_finalize(__
 sqlite3 * master_db = 0;           /* The database */
 
 
-int SendHandler(int nDocID, const char * sText)
+int mob_apply(int wid, int uid, int snum, const char * sql)
 {
 	sqlite3_stmt *pStmt = NULL;
-	int uid_snum;
-	int snum;
-	char * base; // get from sText /*| ... |*/
 	// 여기서 누락체크하여 누락이 있으면 잠시후 다시 체크하여 전송 (missing 태이블)
 	// 없으면 삭제 가능한 위치로 전송 
 	// 누락이 없으면 순서대로 바로 소진(data 는 테이블에 남지 않는다.)
 
-	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main FROM works WHERE num=%d", nDocID),
-		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), sText, 0, 0, 0);
-		mob_sync_db((sqlite3 *)sqlite3_column_int64(pStmt, 0), 0);
+	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main FROM works WHERE num=%d", wid),
+		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), sql, 0, 0, 0);
+		mob_sync_db((sqlite3 *)sqlite3_column_int64(pStmt, 0), 0, uid, snum);
 		break;
 	);
 	return 0;
@@ -39,8 +36,6 @@ int SendHandler(int nDocID, const char * sText)
 
 int mob_init(int argc, char** argv)
 {
-	alljoyn_set_handler(&SendHandler);
-
 	return alljoyn_connect(argc, argv);
 }
 
@@ -57,7 +52,7 @@ static int _create_db(long id, const char * mark, sqlite3 **ppDb)
 
 	strPrintf(&fname, "%ld_%s.db3", id, mark);
 
-	unlink(fname.z);
+	_unlink(fname.z);
 
 	int rc = sqlite3_open(fname.z, ppDb);
 
@@ -75,7 +70,7 @@ static int _close_db(long id, const char * mark, sqlite3 *pDb)
 
 	strPrintf(&fname, "%ld_%s.db3", id, mark);
 
-	unlink(fname.z);
+	_unlink(fname.z);
 
 	strFree(&fname);
 
@@ -85,7 +80,7 @@ static int _close_db(long id, const char * mark, sqlite3 *pDb)
 int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 {
 	if (!master_db && sqlite3_open(":memory:", &master_db) == SQLITE_OK)
-		sqlite3_exec(master_db, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, ptr_main BIGINT, ptr_back BIGINT, ptr_undo BIGINT, ptr_mob BIGINT, uid INTEGER, uid_snum INT DEFAULT 0, snum INT DEFAULT 1); PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+		sqlite3_exec(master_db, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid INT, ptr_main BIGINT, ptr_back BIGINT, ptr_undo BIGINT, ptr_mob BIGINT); PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 	else {
 		master_db = 0;
 		return SQLITE_ERROR;
@@ -105,13 +100,13 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 			else return nRet;
 
 			if ((nRet = _create_db(id, "undo", &pUndoDb)) == SQLITE_OK) 
-				sqlite3_exec(pUndoDb, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+				sqlite3_exec(pUndoDb, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid INT, snum INT DEFAULT 1, undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 			else return nRet;
 
 			if ((nRet = sqlite3_open(":memory:", &pMobDb)) == SQLITE_OK) {
 				sqlite3_exec(pMobDb, 
 					"CREATE TABLE member (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, key CHAR(32), pwd CHAR(32), connected BOOL DEFAULT 0);"
-					"CREATE TABLE received (uid INTEGER, snum INTEGER, region VARCHAR(1024), data TEXT, CONSTRAINT[] PRIMARY KEY(uid, snum));"
+					"CREATE TABLE received (uid INTEGER, snum INTEGER, base VARCHAR(1024), data TEXT, CONSTRAINT[] PRIMARY KEY(uid, snum));"
 					"CREATE TABLE files (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 0, sent BOOL default 0, mtime TIMESTAMP, size INT64, uri VARCHAR(1024), path VARCHAR(1024));"
 					"PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 				if (alljoyn_is_server() == 1) sqlite3_exec(pMobDb, "INSERT INTO member (pwd) VALUES ('-');INSERT INTO member (pwd) VALUES ('12345678');", 0, 0, 0);
@@ -127,11 +122,12 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 	return SQLITE_ERROR;
 }
 
-int mob_sync_db(sqlite3 * pDb, int send)
+int mob_sync_db(sqlite3 * pDb, int send, int uid, int snum)
 {
 	int done = 0;
 	Str base, undo, redo, bak;
 	sqlite3_stmt *pStmt = NULL;
+	sqlite3_stmt *pStmt2 = NULL;
 
 	strInit(&undo);
 	strInit(&redo);
@@ -144,25 +140,29 @@ int mob_sync_db(sqlite3 * pDb, int send)
 
 	if (redo.z){
 		int wid = -1;
-		int uid_snum, snum;
 		sqlite3 *pMobDb = 0;
+		sqlite3 *pUndoDb = 0;
 
-		QUERY_SQL_V(master_db, pStmt, ("SELECT num, ptr_back, ptr_undo, ptr_mob, uid_snum, snum FROM works WHERE ptr_main = %ld;", (long)pDb),
+		QUERY_SQL_V(master_db, pStmt, ("SELECT num, ptr_back, ptr_undo, ptr_mob FROM works WHERE ptr_main = %ld;", (long)pDb),
 			wid = sqlite3_column_int(pStmt, 0);
 			sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 1), redo.z, 0, 0, 0);
 
+			pUndoDb = (sqlite3 *)sqlite3_column_int64(pStmt, 2);
 			pMobDb = (sqlite3 *)sqlite3_column_int64(pStmt, 3);
-			uid_snum = sqlite3_column_int(pStmt, 4);
-			snum = sqlite3_column_int(pStmt, 5);
 
-			EXECUTE_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 2), ("INSERT INTO works (uid, snum, undo, redo) VALUES (%d, %d, %Q, %Q);", uid_snum, snum, undo.z, redo.z));
-
-			EXECUTE_SQL_V(master_db, ("UPDATE works SET uid_snum=uid, snum=snum+1 WHERE ptr_main = %ld;", (long)pDb));
+			if (send) {
+				uid = alljoyn_user_id();
+				QUERY_SQL_V(pUndoDb, pStmt2, ("SELECT MAX(snum) AS sn FROM works WHERE uid = %d;", uid),
+					snum = sqlite3_column_int(pStmt, 0) + 1;
+					break;
+				);
+			}
+			EXECUTE_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 2), ("INSERT INTO works (uid, snum, base, undo, redo) VALUES (%d, %d, %Q, %Q, %Q);", uid, snum, base, undo.z, redo.z));
 			break;
 		);
 
 		if (pMobDb && send && wid > 0) {
-			strPrintf(&redo, "/*|%d|%d|%s|*/", uid_snum, snum, base.z);
+			strPrintf(&redo, "/*|%d|%d|%s|*/", uid, snum, base.z);
 			alljoyn_send(wid, redo.z, redo.nUsed);
 		}
 	}

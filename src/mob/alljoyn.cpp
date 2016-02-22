@@ -30,6 +30,7 @@
 #include <time.h>
 #include <vector>
 #include <map>
+#include "mob.h"
 #include "util.h"
 #include "mob_alljoyn.h"
 
@@ -103,7 +104,6 @@ static const char* CHAT_SERVICE_INTERFACE_NAME = "org.alljoyn.bus.samples.chat";
 static const char* NAME_PREFIX = "org.alljoyn.bus.samples.chat.";
 static const char* CHAT_SERVICE_OBJECT_PATH = "/chatService";
 static const SessionPort CHAT_PORT = 27;
-static fnSendHandler fnRecvData = NULL;
 
 /* static data. */
 static ajn::BusAttachment* s_bus = NULL;
@@ -268,11 +268,6 @@ class ChatObject : public BusObject {
 				if (IsOmitted(nDocID)) FixOmitted(nDocID);
 			}
 		}
-		std::vector<WORKS *>::iterator iter;
-
-		for (iter = m_vWorks.begin(); iter != m_vWorks.end(); iter++) {
-			out += (*iter)->data;
-		}
 
 		// 충돌이 존재하면 롤백
 
@@ -287,93 +282,96 @@ class ChatObject : public BusObject {
         QCC_UNUSED(member);
         QCC_UNUSED(srcPath);
 
-		if (fnRecvData) {
-			uint8_t * data;
-			size_t size;
-			std::map<int, TRAIN>::iterator iter;
+		uint8_t * data;
+		size_t size;
+		std::map<int, TRAIN>::iterator iter;
 
-			msg->GetArg(0)->Get("ay", &size, &data);
+		msg->GetArg(0)->Get("ay", &size, &data);
 
-			if (IS_TRAIN_HEADER(data) && size == sizeof(TRAIN_HEADER)) {
-				TRAIN_HEADER * pTH = (TRAIN_HEADER *)data;
+		if (IS_TRAIN_HEADER(data) && size == sizeof(TRAIN_HEADER)) {
+			TRAIN_HEADER * pTH = (TRAIN_HEADER *)data;
 
-				m_mTrain[pTH->chain].action = pTH->action;
-				m_mTrain[pTH->chain].aid = pTH->aid;
-				m_mTrain[pTH->chain].wid = pTH->wid;
-			}
-			else if ((iter = m_mTrain.find(((int*)data)[0])) != m_mTrain.end()){
-				if (size == sizeof(int)) {
-					switch (iter->second.action) {
-					case ACT_OMITTED:
-						// undo DB 에서 uid, snum 을 찾아 타킷 발송.
-						break;
-					case ACT_DATA:
-						printf("%s:(%d) %ssqlite>", msg->GetSender(), iter->second.length, iter->second.body);
-						m_mHangar[iter->second.aid].action = iter->second.action;
-						m_mHangar[iter->second.aid].wid = iter->second.wid;
-						memcpy(m_mHangar[iter->second.aid].body, iter->second.body, iter->second.length);
-						m_mHangar[iter->second.aid].length = iter->second.length;
-						// 
-						break;
-					case ACT_FLIST:
-						if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
-							int n = 0, len=0;
-							char * data = 0;
-							FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body;
+			m_mTrain[pTH->chain].action = pTH->action;
+			m_mTrain[pTH->chain].aid = pTH->aid;
+			m_mTrain[pTH->chain].wid = pTH->wid;
+		}
+		else if ((iter = m_mTrain.find(((int*)data)[0])) != m_mTrain.end()){
+			if (size == sizeof(int)) {
+				switch (iter->second.action) {
+				case ACT_OMITTED:
+					// undo DB 에서 uid, snum 을 찾아 타킷 발송.
+					break;
+				case ACT_DATA:
+					printf("%s:(%d) %ssqlite>", msg->GetSender(), iter->second.length, iter->second.body);
+					m_mHangar[iter->second.aid].action = iter->second.action;
+					m_mHangar[iter->second.aid].wid = iter->second.wid;
+					memcpy(m_mHangar[iter->second.aid].body, iter->second.body, iter->second.length);
+					m_mHangar[iter->second.aid].length = iter->second.length;
+					// 
+					break;
+				case ACT_FLIST:
+					if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
+						int n = 0, len=0;
+						char * data = 0;
+						FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body;
 
-							while (n < iter->second.length) {
+						while (n < iter->second.length) {
 //								find pFSI->uri and cpy
 
-								if (catmem(&data, pFSI, sizeof(FILE_SEND_ITEM)) == sizeof(FILE_SEND_ITEM)) len += sizeof(FILE_SEND_ITEM);
+							if (catmem(&data, pFSI, sizeof(FILE_SEND_ITEM)) == sizeof(FILE_SEND_ITEM)) len += sizeof(FILE_SEND_ITEM);
 
-								n += sizeof(FILE_SEND_ITEM);
-								pFSI++;
-							}
-							if (len > 0) SendData(iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data, len); // special target most be assigned.
+							n += sizeof(FILE_SEND_ITEM);
+							pFSI++;
 						}
-						break;
-					case ACT_FLIST_REQ:
-						if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
-							int n = 0;
-							FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body;
-
-							while (n < iter->second.length) {
-								// load pFSI->uri as mem
-								char * fmem = 0;
-								int fsize = 0;
-								SendData(iter->second.aid, ACT_FILE, iter->second.wid, fmem, fsize);// special target most be assigned.
-								n += sizeof(FILE_SEND_ITEM);
-								pFSI++;
-							}
-							SendData(iter->second.aid, ACT_END, iter->second.wid, 0, 0);// special target most be assigned.
-						}
-						break;
-					case ACT_FILE:
-						// save as file of data and register in file list table(or map).
-						break;
-					case ACT_END:
-						{
-							std::map<int, TRAIN>::iterator _iter;
-
-							if ((_iter = m_mHangar.find(iter->second.aid)) != m_mHangar.end()){
-								std::string s;
-
-								// file:// 를 테이블을 이용하여 변환하여 DB 에 반영
-								// apply 하고 머지후 전달할것.
-
-								Save(_iter->second.wid, _iter->second.body, _iter->second.length, s);
-								if (!s.empty()) fnRecvData(_iter->second.wid, s.data());
-								m_mHangar.erase(_iter);
-							}
-						}
-						break;
+						if (len > 0) SendData(iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data, len); // special target most be assigned.
 					}
-					m_mTrain.erase(iter);
+					break;
+				case ACT_FLIST_REQ:
+					if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
+						int n = 0;
+						FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body;
+
+						while (n < iter->second.length) {
+							// load pFSI->uri as mem
+							char * fmem = 0;
+							int fsize = 0;
+							SendData(iter->second.aid, ACT_FILE, iter->second.wid, fmem, fsize);// special target most be assigned.
+							n += sizeof(FILE_SEND_ITEM);
+							pFSI++;
+						}
+						SendData(iter->second.aid, ACT_END, iter->second.wid, 0, 0);// special target most be assigned.
+					}
+					break;
+				case ACT_FILE:
+					// save as file of data and register in file list table(or map).
+					break;
+				case ACT_END:
+					{
+						std::map<int, TRAIN>::iterator _iter;
+
+						if ((_iter = m_mHangar.find(iter->second.aid)) != m_mHangar.end()){
+							std::string s;
+
+							// file:// 를 테이블을 이용하여 변환하여 DB 에 반영
+							// apply 하고 머지후 전달할것.
+
+							Save(_iter->second.wid, _iter->second.body, _iter->second.length, s);
+
+							std::vector<WORKS *>::iterator __iter;
+
+							for (__iter = m_vWorks.begin(); __iter != m_vWorks.end(); __iter++) {
+								mob_apply(_iter->second.wid, (*__iter)->uid, (*__iter)->snum, (*__iter)->data);
+							}
+							m_mHangar.erase(_iter);
+						}
+					}
+					break;
 				}
-				else {
-					catmem(&(iter->second.body), (void *)(((int*)data) + 1), size - sizeof(int));
-					iter->second.length += size - sizeof(int);
-				}
+				m_mTrain.erase(iter);
+			}
+			else {
+				catmem(&(iter->second.body), (void *)(((int*)data) + 1), size - sizeof(int));
+				iter->second.length += size - sizeof(int);
 			}
 		}
     }
@@ -797,7 +795,7 @@ void alljoyn_disconnect(void)
 
 int alljoyn_send(int nDocID, char * sText, int nLength)
 {
-	int aid = time(NULL);
+	time_t aid = time(NULL);
 	int ret = s_chatObj->SendData(aid, ACT_DATA, nDocID, sText, nLength);
 
 	if (ER_OK == ret) {
@@ -828,11 +826,6 @@ int alljoyn_send(int nDocID, char * sText, int nLength)
 	}
 
 	return ret;
-}
-
-void alljoyn_set_handler(fnSendHandler fnProc)
-{
-	fnRecvData = fnProc;
 }
 
 int alljoyn_doc_id()

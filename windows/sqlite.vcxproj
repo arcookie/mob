@@ -40,11 +40,11 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>sqlite/$(Configuration)\</OutDir>
+    <OutDir>../lib/debug/</OutDir>
     <IntDir>sqlite/$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>sqlite/$(Configuration)\</OutDir>
+    <OutDir>../lib/release/</OutDir>
     <IntDir>sqlite/$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
