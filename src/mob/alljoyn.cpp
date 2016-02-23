@@ -100,10 +100,10 @@ public:
 using namespace ajn;
 
 /* constants. */
-static const char* CHAT_SERVICE_INTERFACE_NAME = "org.alljoyn.bus.samples.chat";
-static const char* NAME_PREFIX = "org.alljoyn.bus.samples.chat.";
-static const char* CHAT_SERVICE_OBJECT_PATH = "/chatService";
-static const SessionPort CHAT_PORT = 27;
+static const char* MOB_SERVICE_INTERFACE_NAME = "org.alljoyn.bus.arcookie.mob";
+static const char* NAME_PREFIX = "org.alljoyn.bus.arcookie.mob.";
+static const char* MOB_SERVICE_OBJECT_PATH = "/mobService";
+static const SessionPort MOB_PORT = 27;
 
 /* static data. */
 static ajn::BusAttachment* s_bus = NULL;
@@ -149,34 +149,34 @@ BOOL asVector(LPCTSTR sText, int nLength, LPCTSTR cDelimit, std::vector<std::str
 }
 
 /* Bus object */
-class ChatObject : public BusObject {
+class CMobObject : public BusObject {
   public:
 
-    ChatObject(BusAttachment& bus, const char* path) : BusObject(path), chatSignalMember(NULL)
+    CMobObject(BusAttachment& bus, const char* path) : BusObject(path), mobSignalMember(NULL)
     {
         QStatus status;
 
-        /* Add the chat interface to this object */
-        const InterfaceDescription* chatIntf = bus.GetInterface(CHAT_SERVICE_INTERFACE_NAME);
-        assert(chatIntf);
-        AddInterface(*chatIntf);
+        /* Add the mob interface to this object */
+        const InterfaceDescription* mobIntf = bus.GetInterface(MOB_SERVICE_INTERFACE_NAME);
+        assert(mobIntf);
+        AddInterface(*mobIntf);
 
-        /* Store the Chat signal member away so it can be quickly looked up when signals are sent */
-        chatSignalMember = chatIntf->GetMember("Chat");
-        assert(chatSignalMember);
+        /* Store the mob signal member away so it can be quickly looked up when signals are sent */
+        mobSignalMember = mobIntf->GetMember("Mob");
+        assert(mobSignalMember);
 
         /* Register signal handler */
         status =  bus.RegisterSignalHandler(this,
-                                            static_cast<MessageReceiver::SignalHandler>(&ChatObject::OnRecvData),
-                                            chatSignalMember,
+                                            static_cast<MessageReceiver::SignalHandler>(&CMobObject::OnRecvData),
+                                            mobSignalMember,
                                             NULL);
 
         if (ER_OK != status) {
-            printf("Failed to register signal handler for ChatObject::Chat (%s)\n", QCC_StatusText(status));
+            printf("Failed to register signal handler for CMobObject::Mob (%s)\n", QCC_StatusText(status));
         }
     }
 
-	~ChatObject(){
+	~CMobObject(){
 		std::vector<WORKS *>::iterator iter;
 
 		for (iter = m_vWorks.begin(); iter != m_vWorks.end(); iter++) {
@@ -196,9 +196,9 @@ class ChatObject : public BusObject {
 
 			if (nLength > 0) memcpy(pBuf + sizeof(int), pData, nLength);
 
-			MsgArg chatArg("ay", l, pBuf);
+			MsgArg mobArg("ay", l, pBuf);
 
-			status = Signal(NULL, s_sessionId, *chatSignalMember, &chatArg, 1, 0, flags);
+			status = Signal(NULL, s_sessionId, *mobSignalMember, &mobArg, 1, 0, flags);
 
 			delete[] pBuf;
 		}
@@ -206,7 +206,7 @@ class ChatObject : public BusObject {
 		return status;
 	}
 
-    /** Send a Chat signal */
+    /** Send a mob signal */
 	QStatus SendData(int nAID, int nAction, int wid, const char * msg, int nLength) {
 		TRAIN_HEADER th;
 		uint8_t flags = 0;
@@ -220,9 +220,9 @@ class ChatObject : public BusObject {
 		th.chain |= s_user_id; // indivisualize using by user id
 
 		QStatus status;
-		MsgArg chatArg("ay", sizeof(TRAIN_HEADER), &th);
+		MsgArg mobArg("ay", sizeof(TRAIN_HEADER), &th);
 
-		if ((status = Signal(NULL, s_sessionId, *chatSignalMember, &chatArg, 1, 0, flags)) == ER_OK && nLength > 0) {
+		if ((status = Signal(NULL, s_sessionId, *mobSignalMember, &mobArg, 1, 0, flags)) == ER_OK && nLength > 0) {
 			int l = nLength > SEND_BUF ? SEND_BUF : nLength;
 			const char * p = msg;
 
@@ -276,7 +276,7 @@ class ChatObject : public BusObject {
 		return out;
 	}
 
-    /** Receive a signal from another Chat client */
+    /** Receive a signal from another mob client */
     void OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg)
     {
         QCC_UNUSED(member);
@@ -392,7 +392,7 @@ class ChatObject : public BusObject {
 	  std::vector<WORKS *>			m_vWorks;
 	  std::map<int, TRAIN>			m_mTrain;
 	  std::map<int, TRAIN>			m_mHangar;
-	  const InterfaceDescription::Member* chatSignalMember;
+	  const InterfaceDescription::Member* mobSignalMember;
 };
 
 class MyBusListener : public BusListener, public SessionPortListener, public SessionListener {
@@ -402,14 +402,14 @@ class MyBusListener : public BusListener, public SessionPortListener, public Ses
 
         if (s_sessionHost.empty()) {
             const char* convName = name + strlen(NAME_PREFIX);
-            printf("Discovered chat conversation: \"%s\"\n", convName);
+            printf("Discovered mob conversation: \"%s\"\n", convName);
 
             /* Join the conversation */
             /* Since we are in a callback we must enable concurrent callbacks before calling a synchronous method. */
             s_sessionHost = name;
             s_bus->EnableConcurrentCallbacks();
             SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, true, SessionOpts::PROXIMITY_ANY, TRANSPORT_ANY);
-            QStatus status = s_bus->JoinSession(name, CHAT_PORT, this, s_sessionId, opts);
+            QStatus status = s_bus->JoinSession(name, MOB_PORT, this, s_sessionId, opts);
             if (ER_OK == status) {
                 printf("Joined conversation \"%s\"\n", convName);
             } else {
@@ -437,8 +437,8 @@ class MyBusListener : public BusListener, public SessionPortListener, public Ses
     }
     bool AcceptSessionJoiner(SessionPort sessionPort, const char* joiner, const SessionOpts& opts)
     {
-        if (sessionPort != CHAT_PORT) {
-            printf("Rejecting join attempt on non-chat session port %d\nsqlite> ", sessionPort);
+        if (sessionPort != MOB_PORT) {
+            printf("Rejecting join attempt on non-mob session port %d\nsqlite> ", sessionPort);
             return false;
         }
 
@@ -478,7 +478,7 @@ class MyBusListener : public BusListener, public SessionPortListener, public Ses
 };
 
 /* More static data. */
-static ChatObject* s_chatObj = NULL;
+static CMobObject* s_mobObj = NULL;
 static MyBusListener s_busListener;
 
 #ifdef __cplusplus
@@ -488,7 +488,7 @@ extern "C" {
 /** Send usage information to stdout and exit with EXIT_FAILURE. */
 static void Usage()
 {
-    printf("Usage: chat [-h] [-s <name>] | [-j <name>]\n");
+    printf("Usage: mob [-h] [-s <name>] | [-j <name>]\n");
     exit(EXIT_FAILURE);
 }
 
@@ -548,146 +548,7 @@ void ValidateCommandLine()
     }
 }
 
-/** Create the interface, report the result to stdout, and return the result status. */
-QStatus CreateInterface(void)
-{
-    /* Create org.alljoyn.bus.samples.chat interface */
-    InterfaceDescription* chatIntf = NULL;
-    QStatus status = s_bus->CreateInterface(CHAT_SERVICE_INTERFACE_NAME, chatIntf);
-
-    if (ER_OK == status) {
-        chatIntf->AddSignal("Chat", "ay",  "data", 0);
-        chatIntf->Activate();
-    } else {
-        printf("Failed to create interface \"%s\" (%s)\n", CHAT_SERVICE_INTERFACE_NAME, QCC_StatusText(status));
-    }
-
-    return status;
-}
-
-/** Start the message bus, report the result to stdout, and return the status code. */
-QStatus StartMessageBus(void)
-{
-    QStatus status = s_bus->Start();
-
-    if (ER_OK == status) {
-        printf("BusAttachment started.\n");
-    } else {
-        printf("Start of BusAttachment failed (%s).\n", QCC_StatusText(status));
-    }
-
-    return status;
-}
-
-/** Register the bus object and connect, report the result to stdout, and return the status code. */
-QStatus RegisterBusObject(void)
-{
-    QStatus status = s_bus->RegisterBusObject(*s_chatObj);
-
-    if (ER_OK == status) {
-        printf("RegisterBusObject succeeded.\n");
-    } else {
-        printf("RegisterBusObject failed (%s).\n", QCC_StatusText(status));
-    }
-
-    return status;
-}
-
-/** Connect, report the result to stdout, and return the status code. */
-QStatus ConnectBusAttachment(void)
-{
-    QStatus status = s_bus->Connect();
-
-    if (ER_OK == status) {
-        printf("Connect to '%s' succeeded.\n", s_bus->GetConnectSpec().c_str());
-    } else {
-        printf("Failed to connect to '%s' (%s).\n", s_bus->GetConnectSpec().c_str(), QCC_StatusText(status));
-    }
-
-    return status;
-}
-
-/** Request the service name, report the result to stdout, and return the status code. */
-QStatus RequestName(void)
-{
-    QStatus status = s_bus->RequestName(s_advertisedName.c_str(), DBUS_NAME_FLAG_DO_NOT_QUEUE);
-
-    if (ER_OK == status) {
-        printf("RequestName('%s') succeeded.\n", s_advertisedName.c_str());
-    } else {
-        printf("RequestName('%s') failed (status=%s).\n", s_advertisedName.c_str(), QCC_StatusText(status));
-    }
-
-    return status;
-}
-
-/** Create the session, report the result to stdout, and return the status code. */
-QStatus CreateSession(TransportMask mask)
-{
-    SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, true, SessionOpts::PROXIMITY_ANY, mask);
-    SessionPort sp = CHAT_PORT;
-    QStatus status = s_bus->BindSessionPort(sp, opts, s_busListener);
-
-    if (ER_OK == status) {
-        printf("BindSessionPort succeeded.\n");
-    } else {
-        printf("BindSessionPort failed (%s).\n", QCC_StatusText(status));
-    }
-
-    return status;
-}
-
-/** Advertise the service name, report the result to stdout, and return the status code. */
-QStatus AdvertiseName(TransportMask mask)
-{
-    QStatus status = s_bus->AdvertiseName(s_advertisedName.c_str(), mask);
-
-    if (ER_OK == status) {
-        printf("Advertisement of the service name '%s' succeeded.\n", s_advertisedName.c_str());
-    } else {
-        printf("Failed to advertise name '%s' (%s).\n", s_advertisedName.c_str(), QCC_StatusText(status));
-    }
-
-    return status;
-}
-
-/** Begin discovery on the well-known name of the service to be called, report the result to
-   stdout, and return the result status. */
-QStatus FindAdvertisedName(void)
-{
-    /* Begin discovery on the well-known name of the service to be called */
-    QStatus status = s_bus->FindAdvertisedName(s_joinName.c_str());
-
-    if (status == ER_OK) {
-        printf("org.alljoyn.Bus.FindAdvertisedName ('%s') succeeded.\n", s_joinName.c_str());
-    } else {
-        printf("org.alljoyn.Bus.FindAdvertisedName ('%s') failed (%s).\n", s_joinName.c_str(), QCC_StatusText(status));
-    }
-
-    return status;
-}
-
-/** Wait for join session to complete, report the event to stdout, and return the result status. */
-QStatus WaitForJoinSessionCompletion(void)
-{
-    unsigned int count = 0;
-
-    while (!s_joinComplete && !s_interrupt) {
-        if (0 == (count++ % 100)) {
-            printf("Waited %u seconds for JoinSession completion.\n", count / 100);
-        }
-
-#ifdef _WIN32
-        Sleep(10);
-#else
-        usleep(10 * 1000);
-#endif
-    }
-
-    return s_joinComplete && !s_interrupt ? ER_OK : ER_ALLJOYN_JOINSESSION_REPLY_CONNECT_FAILED;
-}
-
-/** Take input from stdin and send it as a chat message, continue until an error or
+/** Take input from stdin and send it as a mob message, continue until an error or
  * SIGINT occurs, return the result status. */
 int alljoyn_connect(int argc, char** argv)
 {
@@ -710,12 +571,23 @@ int alljoyn_connect(int argc, char** argv)
 
 	if (ER_OK == status) {
 		/* Create message bus */
-		s_bus = new BusAttachment("chat", true);
+		s_bus = new BusAttachment("mob", true);
 
 		if (s_bus) {
 
 			if (ER_OK == status) {
-				status = CreateInterface();
+				/* Create org.alljoyn.bus.arcookie.mob interface */
+				InterfaceDescription* mobIntf = NULL;
+				
+				status = s_bus->CreateInterface(MOB_SERVICE_INTERFACE_NAME, mobIntf);
+
+				if (ER_OK == status) {
+					mobIntf->AddSignal("mob", "ay", "data", 0);
+					mobIntf->Activate();
+				}
+				else {
+					printf("Failed to create interface \"%s\" (%s)\n", MOB_SERVICE_INTERFACE_NAME, QCC_StatusText(status));
+				}
 			}
 
 			if (ER_OK == status) {
@@ -723,18 +595,39 @@ int alljoyn_connect(int argc, char** argv)
 			}
 
 			if (ER_OK == status) {
-				status = StartMessageBus();
+				status = s_bus->Start();
+
+				if (ER_OK == status) {
+					printf("BusAttachment started.\n");
+				}
+				else {
+					printf("Start of BusAttachment failed (%s).\n", QCC_StatusText(status));
+				}
 			}
 
 			/* Create the bus object that will be used to send and receive signals */
-			s_chatObj = new ChatObject(*s_bus, CHAT_SERVICE_OBJECT_PATH);
+			s_mobObj = new CMobObject(*s_bus, MOB_SERVICE_OBJECT_PATH);
 
 			if (ER_OK == status) {
-				status = RegisterBusObject();
+				status = s_bus->RegisterBusObject(*s_mobObj);
+
+				if (ER_OK == status) {
+					printf("RegisterBusObject succeeded.\n");
+				}
+				else {
+					printf("RegisterBusObject failed (%s).\n", QCC_StatusText(status));
+				}
 			}
 
 			if (ER_OK == status) {
-				status = ConnectBusAttachment();
+				status = s_bus->Connect();
+
+				if (ER_OK == status) {
+					printf("Connect to '%s' succeeded.\n", s_bus->GetConnectSpec().c_str());
+				}
+				else {
+					printf("Failed to connect to '%s' (%s).\n", s_bus->GetConnectSpec().c_str(), QCC_StatusText(status));
+				}
 			}
 
 			/* Advertise or discover based on command line options */
@@ -748,26 +641,72 @@ int alljoyn_connect(int argc, char** argv)
 				* 3) Advertise the well-known name.
 				*/
 				if (ER_OK == status) {
-					status = RequestName();
+					status = s_bus->RequestName(s_advertisedName.c_str(), DBUS_NAME_FLAG_DO_NOT_QUEUE);
+
+					if (ER_OK == status) {
+						printf("RequestName('%s') succeeded.\n", s_advertisedName.c_str());
+					}
+					else {
+						printf("RequestName('%s') failed (status=%s).\n", s_advertisedName.c_str(), QCC_StatusText(status));
+					}
 				}
 
 				const TransportMask SERVICE_TRANSPORT_TYPE = TRANSPORT_ANY;
 
 				if (ER_OK == status) {
-					status = CreateSession(SERVICE_TRANSPORT_TYPE);
+					SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, true, SessionOpts::PROXIMITY_ANY, SERVICE_TRANSPORT_TYPE);
+					SessionPort sp = MOB_PORT;
+					
+					status = s_bus->BindSessionPort(sp, opts, s_busListener);
+
+					if (ER_OK == status) {
+						printf("BindSessionPort succeeded.\n");
+					}
+					else {
+						printf("BindSessionPort failed (%s).\n", QCC_StatusText(status));
+					}
 				}
 
 				if (ER_OK == status) {
-					status = AdvertiseName(SERVICE_TRANSPORT_TYPE);
+					status = s_bus->AdvertiseName(s_advertisedName.c_str(), SERVICE_TRANSPORT_TYPE);
+
+					if (ER_OK == status) {
+						printf("Advertisement of the service name '%s' succeeded.\n", s_advertisedName.c_str());
+					}
+					else {
+						printf("Failed to advertise name '%s' (%s).\n", s_advertisedName.c_str(), QCC_StatusText(status));
+					}
 				}
 			}
 			else {
 				if (ER_OK == status) {
-					status = FindAdvertisedName();
+					/* Begin discovery on the well-known name of the service to be called */
+					status = s_bus->FindAdvertisedName(s_joinName.c_str());
+
+					if (status == ER_OK) {
+						printf("org.alljoyn.Bus.FindAdvertisedName ('%s') succeeded.\n", s_joinName.c_str());
+					}
+					else {
+						printf("org.alljoyn.Bus.FindAdvertisedName ('%s') failed (%s).\n", s_joinName.c_str(), QCC_StatusText(status));
+					}
 				}
 
 				if (ER_OK == status) {
-					status = WaitForJoinSessionCompletion();
+					unsigned int count = 0;
+
+					while (!s_joinComplete && !s_interrupt) {
+						if (0 == (count++ % 100)) {
+							printf("Waited %u seconds for JoinSession completion.\n", count / 100);
+						}
+
+#ifdef _WIN32
+						Sleep(10);
+#else
+						usleep(10 * 1000);
+#endif
+					}
+
+					status = (s_joinComplete && !s_interrupt ? ER_OK : ER_ALLJOYN_JOINSESSION_REPLY_CONNECT_FAILED);
 				}
 			}
 		}
@@ -796,7 +735,7 @@ void alljoyn_disconnect(void)
 int alljoyn_send(int nDocID, char * sText, int nLength)
 {
 	time_t aid = time(NULL);
-	int ret = s_chatObj->SendData(aid, ACT_DATA, nDocID, sText, nLength);
+	int ret = s_mobObj->SendData(aid, ACT_DATA, nDocID, sText, nLength);
 
 	if (ER_OK == ret) {
 		int len = 0, l;
@@ -822,7 +761,7 @@ int alljoyn_send(int nDocID, char * sText, int nLength)
 			}
 			else p++;
 		}
-		if (len > 0) ret = s_chatObj->SendData(aid, ACT_FLIST, nDocID, data, len);
+		if (len > 0) ret = s_mobObj->SendData(aid, ACT_FLIST, nDocID, data, len);
 	}
 
 	return ret;

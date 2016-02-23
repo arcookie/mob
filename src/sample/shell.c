@@ -1710,7 +1710,7 @@ static int shell_exec(
     }
   } /* end while */
 
-  if (rc == SQLITE_OK) mob_sync_db(db, 1, -1, 1);
+  if (rc == SQLITE_OK) mob_sync_db(db, 0, -1, 1);
 
   return rc;
 }

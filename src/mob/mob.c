@@ -28,7 +28,7 @@ int mob_apply(int wid, int uid, int snum, const char * sql)
 
 	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main FROM works WHERE num=%d", wid),
 		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), sql, 0, 0, 0);
-		mob_sync_db((sqlite3 *)sqlite3_column_int64(pStmt, 0), 0, uid, snum);
+		mob_sync_db((sqlite3 *)sqlite3_column_int64(pStmt, 0), 1, uid, snum);
 		break;
 	);
 	return 0;
@@ -122,7 +122,7 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 	return SQLITE_ERROR;
 }
 
-int mob_sync_db(sqlite3 * pDb, int send, int uid, int snum)
+int mob_sync_db(sqlite3 * pDb, int end, int uid, int snum)
 {
 	int done = 0;
 	Str base, undo, redo, bak;
@@ -150,7 +150,7 @@ int mob_sync_db(sqlite3 * pDb, int send, int uid, int snum)
 			pUndoDb = (sqlite3 *)sqlite3_column_int64(pStmt, 2);
 			pMobDb = (sqlite3 *)sqlite3_column_int64(pStmt, 3);
 
-			if (send) {
+			if (!end) {
 				uid = alljoyn_user_id();
 				QUERY_SQL_V(pUndoDb, pStmt2, ("SELECT MAX(snum) AS sn FROM works WHERE uid = %d;", uid),
 					snum = sqlite3_column_int(pStmt, 0) + 1;
@@ -161,7 +161,7 @@ int mob_sync_db(sqlite3 * pDb, int send, int uid, int snum)
 			break;
 		);
 
-		if (pMobDb && send && wid > 0) {
+		if (pMobDb && !end && wid > 0) {
 			strPrintf(&redo, "/*|%d|%d|%s|*/", uid, snum, base.z);
 			alljoyn_send(wid, redo.z, redo.nUsed);
 		}
