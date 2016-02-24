@@ -1,5 +1,76 @@
 
-* 
+
+			//sqlite3 *pMobDb;
+
+			if ((nRet = _create_db(id, "bak", &pBackDb)) == SQLITE_OK)
+				sqlite3_exec(pBackDb, "PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+			else return nRet;
+
+			if ((nRet = _create_db(id, "undo", &pUndoDb)) == SQLITE_OK) 
+				sqlite3_exec(pUndoDb, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid INT, snum INT DEFAULT 1, undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+			else return nRet;
+
+			//if ((nRet = sqlite3_open(":memory:", &pMobDb)) == SQLITE_OK) {
+			//	sqlite3_exec(pMobDb, 
+			//		"CREATE TABLE member (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, key CHAR(32), pwd CHAR(32), connected BOOL DEFAULT 0);"
+			//		"CREATE TABLE received (uid INTEGER, snum INTEGER, base VARCHAR(1024), data TEXT, CONSTRAINT[] PRIMARY KEY(uid, snum));"
+			//		"CREATE TABLE files (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 0, sent BOOL default 0, mtime TIMESTAMP, size INT64, uri VARCHAR(1024), path VARCHAR(1024));"
+			//		"PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+			//	if (alljoyn_is_server() == 1) sqlite3_exec(pMobDb, "INSERT INTO member (pwd) VALUES ('-');INSERT INTO member (pwd) VALUES ('12345678');", 0, 0, 0);
+			//}
+			//else return nRet;
+
+
+/*
+
+len = p2 - p;
+if (len < 1024)	{
+memcpy(fi.uri, p, len);
+fi.mtime = get_file_mtime(p);
+fi.fsize = get_file_length(p);
+
+add2mem(data, &fi, sizeof(FILE_SEND_ITEM));
+total += sizeof(FILE_SEND_ITEM);
+}
+
+QUERY_SQL_V(pMobDb, pStmt, ("SELECT mtime, size FROM files WHERE path=%Q AND sent=1", path),
+if (mtime == sqlite3_column_int(pStmt, 0) && fsize == sqlite3_column_int64(pStmt, 1)) skip = 1;
+break;
+);
+
+if (skip == 0) EXECUTE_SQL_V(pMobDb, ("INSERT INTO files (uri, path, mtime, size) VALUES (%Q, %Q, %d, %ld)", p, path, mtime, fsize));
+*/
+
+
+/*
+
+if (total > 0) alljoyn_send(ACT_FLIST, wid, data, total);
+
+char ** table = 0;
+int rows = 0, cols = 0;
+
+if (sqlite3_get_table(pMobDb, "SELECT uri, mtime, size FROM files WHERE sent=0", &table, &rows, &cols, 0) == SQLITE_OK) {
+int r = 0, c;
+
+while (++r <= rows) {
+c = -1;
+while (++c < cols) {
+//s = table[r * cols + c];
+}
+}
+
+alljoyn_send(ACT_FLIST, wid, table, redo.nUsed);
+sqlite3_exec(pMobDb, "UPDATE sent=1 WHERE sent=0", 0, 0, 0);
+}
+
+if (table) sqlite3_free_table(table);
+*/
+
+
+
+* 세션 아이디 : doc id
+
+* 사용자 문자열 : user id
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -9,6 +9,8 @@
 #define ACT_OMITTED		4
 #define ACT_END			5
 
+#define NAME_PREFIX	"org.alljoyn.bus.arcookie.mob."
+
 /*
 ** Make sure we can call this stuff from C++.
 */
@@ -17,7 +19,7 @@ extern "C" {
 #endif
 
 	void alljoyn_disconnect(void);
-	int alljoyn_connect(int argc, char** argv);
+	int alljoyn_connect(const char * advertisedName, const char * joinName);
 
 	int alljoyn_send(int nDocID, char * sText, int nLength);
 

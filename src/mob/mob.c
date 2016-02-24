@@ -1,8 +1,21 @@
+/*
+*   2016.2.25
+*
+*   Copyright arCookie. All rights reserved.
+*
+*   The license under which the Mob source code is released is the GPLv2 (or later) from the Free Software Foundation. 
+*
+*   A copy of the license is included with every copy of Mob source code, but you can also read the text of the license here(http://www.arcookie.com/?page_id=414).
+*/
 
 #include "mob.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include "util.h"
 #include "mob_alljoyn.h"
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// defines
 
 #define QUERY_SQL(__db__, __stmt__, __sql__, ...)	\
 	if (sqlite3_prepare_v2(__db__, __sql__, -1, &__stmt__, NULL) == SQLITE_OK) {\
@@ -15,33 +28,18 @@ while (sqlite3_step(__stmt__) == SQLITE_ROW) { __VA_ARGS__ } sqlite3_finalize(__
 #define EXECUTE_SQL_V(__db__, __sql__, ...)	\
 	{ char * __zSQL__ = sqlite3_mprintf __sql__; if (__zSQL__) { sqlite3_exec(__db__, __zSQL__, 0, 0, 0); sqlite3_free(__zSQL__); }}
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// static variables
 
 sqlite3 * master_db = 0;           /* The database */
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// static functions
 
-int mob_apply(int wid, int uid, int snum, const char * sql)
+static void usage()
 {
-	sqlite3_stmt *pStmt = NULL;
-	// 여기서 누락체크하여 누락이 있으면 잠시후 다시 체크하여 전송 (missing 태이블)
-	// 없으면 삭제 가능한 위치로 전송 
-	// 누락이 없으면 순서대로 바로 소진(data 는 테이블에 남지 않는다.)
-
-	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main FROM works WHERE num=%d", wid),
-		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), sql, 0, 0, 0);
-		mob_sync_db((sqlite3 *)sqlite3_column_int64(pStmt, 0), 1, uid, snum);
-		break;
-	);
-	return 0;
-}
-
-int mob_init(int argc, char** argv)
-{
-	return alljoyn_connect(argc, argv);
-}
-
-void mob_exit(void)
-{
-	alljoyn_disconnect();
+	printf("Usage: mob [-h] [-s <name>] | [-j <name>]\n");
+	exit(EXIT_FAILURE);
 }
 
 static int _create_db(long id, const char * mark, sqlite3 **ppDb)
@@ -77,10 +75,81 @@ static int _close_db(long id, const char * mark, sqlite3 *pDb)
 	return rc;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// global functions
+
+int mob_apply(int wid, int uid, int snum, const char * sql)
+{
+	sqlite3_stmt *pStmt = NULL;
+	// 여기서 누락체크하여 누락이 있으면 잠시후 다시 체크하여 전송 (missing 태이블)
+	// 없으면 삭제 가능한 위치로 전송 
+	// 누락이 없으면 순서대로 바로 소진(data 는 테이블에 남지 않는다.)
+
+	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main FROM works WHERE num=%d", wid),
+		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), sql, 0, 0, 0);
+		mob_sync_db((sqlite3 *)sqlite3_column_int64(pStmt, 0), 1, uid, snum);
+		break;
+	);
+	return 0;
+}
+
+int mob_init(int argc, char** argv)
+{
+	char * joinName = 0;
+	char * advertisedName = 0;
+
+	/* Parse command line args */
+	for (int i = 1; i < argc; ++i) {
+		if (0 == strcmp("-s", argv[i])) {
+			if ((++i < argc) && (argv[i][0] != '-')) {
+				advertisedName = sqlite3_mprintf("%s%s", NAME_PREFIX, argv[i]);
+			}
+			else {
+				printf("Missing parameter for \"-s\" option\n");
+				usage();
+			}
+		}
+		else if (0 == strcmp("-j", argv[i])) {
+			if ((++i < argc) && (argv[i][0] != '-')) {
+				joinName = sqlite3_mprintf("%s%s", NAME_PREFIX, argv[i]);
+			}
+			else {
+				printf("Missing parameter for \"-j\" option\n");
+				usage();
+			}
+		}
+		else {
+			if (0 != strcmp("-h", argv[i])) printf("Unknown argument \"%s\"\n", argv[i]);
+			usage();
+		}
+	}
+	/* Validate command line */
+	if (advertisedName && joinName) {
+		printf("Must specify either -s or -j\n");
+		usage();
+	}
+	else if (!advertisedName && !joinName) {
+		printf("Cannot specify both -s  and -j\n");
+		usage();
+	}
+
+	int ret = alljoyn_connect(advertisedName, joinName);
+
+	if (advertisedName) sqlite3_free(advertisedName);
+	if (joinName) sqlite3_free(joinName);
+
+	return ret;
+}
+
+void mob_exit(void)
+{
+	alljoyn_disconnect();
+}
+
 int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 {
 	if (!master_db && sqlite3_open(":memory:", &master_db) == SQLITE_OK)
-		sqlite3_exec(master_db, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid INT, ptr_main BIGINT, ptr_back BIGINT, ptr_undo BIGINT, ptr_mob BIGINT); PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+		sqlite3_exec(master_db, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid INT, ptr_main BIGINT, ptr_back BIGINT, ptr_undo BIGINT); PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 	else {
 		master_db = 0;
 		return SQLITE_ERROR;
@@ -93,7 +162,6 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 			long id = (long)*ppDb;
 			sqlite3 *pBackDb;
 			sqlite3 *pUndoDb;
-			sqlite3 *pMobDb;
 
 			if ((nRet = _create_db(id, "bak", &pBackDb)) == SQLITE_OK)
 				sqlite3_exec(pBackDb, "PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
@@ -103,18 +171,8 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 				sqlite3_exec(pUndoDb, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid INT, snum INT DEFAULT 1, undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 			else return nRet;
 
-			if ((nRet = sqlite3_open(":memory:", &pMobDb)) == SQLITE_OK) {
-				sqlite3_exec(pMobDb, 
-					"CREATE TABLE member (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, key CHAR(32), pwd CHAR(32), connected BOOL DEFAULT 0);"
-					"CREATE TABLE received (uid INTEGER, snum INTEGER, base VARCHAR(1024), data TEXT, CONSTRAINT[] PRIMARY KEY(uid, snum));"
-					"CREATE TABLE files (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 0, sent BOOL default 0, mtime TIMESTAMP, size INT64, uri VARCHAR(1024), path VARCHAR(1024));"
-					"PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
-				if (alljoyn_is_server() == 1) sqlite3_exec(pMobDb, "INSERT INTO member (pwd) VALUES ('-');INSERT INTO member (pwd) VALUES ('12345678');", 0, 0, 0);
-			}
-			else return nRet;
-
 			EXECUTE_SQL_V(*ppDb, ("PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;ATTACH '%ld_bak.db3' as aux;", id));
-			EXECUTE_SQL_V(master_db, ("INSERT INTO works (num, ptr_main, ptr_back, ptr_undo, ptr_mob, uid, uid_snum) VALUES (%d, %ld, %ld, %ld, %ld, %d, %d);", alljoyn_doc_id(), (long)*ppDb, (long)pBackDb, (long)pUndoDb, (long)pMobDb, alljoyn_user_id(), alljoyn_user_id()));
+			EXECUTE_SQL_V(master_db, ("INSERT INTO works (num, uid, ptr_main, ptr_back, ptr_undo) VALUES (%d, %d, %ld, %ld, %ld);", alljoyn_doc_id(), alljoyn_user_id(), (long)*ppDb, (long)pBackDb, (long)pUndoDb));
 		}
 
 		return nRet;
@@ -140,15 +198,13 @@ int mob_sync_db(sqlite3 * pDb, int end, int uid, int snum)
 
 	if (redo.z){
 		int wid = -1;
-		sqlite3 *pMobDb = 0;
 		sqlite3 *pUndoDb = 0;
 
-		QUERY_SQL_V(master_db, pStmt, ("SELECT num, ptr_back, ptr_undo, ptr_mob FROM works WHERE ptr_main = %ld;", (long)pDb),
+		QUERY_SQL_V(master_db, pStmt, ("SELECT num, ptr_back, ptr_undo FROM works WHERE ptr_main = %ld;", (long)pDb),
 			wid = sqlite3_column_int(pStmt, 0);
 			sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 1), redo.z, 0, 0, 0);
 
 			pUndoDb = (sqlite3 *)sqlite3_column_int64(pStmt, 2);
-			pMobDb = (sqlite3 *)sqlite3_column_int64(pStmt, 3);
 
 			if (!end) {
 				uid = alljoyn_user_id();
@@ -157,11 +213,11 @@ int mob_sync_db(sqlite3 * pDb, int end, int uid, int snum)
 					break;
 				);
 			}
-			EXECUTE_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 2), ("INSERT INTO works (uid, snum, base, undo, redo) VALUES (%d, %d, %Q, %Q, %Q);", uid, snum, base, undo.z, redo.z));
+			EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (uid, snum, base, undo, redo) VALUES (%d, %d, %Q, %Q, %Q);", uid, snum, base, undo.z, redo.z));
 			break;
 		);
 
-		if (pMobDb && !end && wid > 0) {
+		if (!end && wid > 0) {
 			strPrintf(&redo, "/*|%d|%d|%s|*/", uid, snum, base.z);
 			alljoyn_send(wid, redo.z, redo.nUsed);
 		}
@@ -205,48 +261,3 @@ int mob_close_db(sqlite3 * pDb)
 
 	return sqlite3_close(pDb);
 }
-
-/*
-
-len = p2 - p;
-if (len < 1024)	{
-memcpy(fi.uri, p, len);
-fi.mtime = get_file_mtime(p);
-fi.fsize = get_file_length(p);
-
-add2mem(data, &fi, sizeof(FILE_SEND_ITEM));
-total += sizeof(FILE_SEND_ITEM);
-}
-
-QUERY_SQL_V(pMobDb, pStmt, ("SELECT mtime, size FROM files WHERE path=%Q AND sent=1", path),
-if (mtime == sqlite3_column_int(pStmt, 0) && fsize == sqlite3_column_int64(pStmt, 1)) skip = 1;
-break;
-);
-
-if (skip == 0) EXECUTE_SQL_V(pMobDb, ("INSERT INTO files (uri, path, mtime, size) VALUES (%Q, %Q, %d, %ld)", p, path, mtime, fsize));
-*/
-
-
-/*
-
-if (total > 0) alljoyn_send(ACT_FLIST, wid, data, total);
-
-char ** table = 0;
-int rows = 0, cols = 0;
-
-if (sqlite3_get_table(pMobDb, "SELECT uri, mtime, size FROM files WHERE sent=0", &table, &rows, &cols, 0) == SQLITE_OK) {
-int r = 0, c;
-
-while (++r <= rows) {
-c = -1;
-while (++c < cols) {
-//s = table[r * cols + c];
-}
-}
-
-alljoyn_send(ACT_FLIST, wid, table, redo.nUsed);
-sqlite3_exec(pMobDb, "UPDATE sent=1 WHERE sent=0", 0, 0, 0);
-}
-
-if (table) sqlite3_free_table(table);
-*/

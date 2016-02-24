@@ -1,18 +1,28 @@
 /*
- * Copyright AllSeen Alliance. All rights reserved.
- *
- *    Permission to use, copy, modify, and/or distribute this software for any
- *    purpose with or without fee is hereby granted, provided that the above
- *    copyright notice and this permission notice appear in all copies.
- *
- *    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- *    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- *    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- *    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- *    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- *    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- */
+*   2016.2.25
+*
+*   Copyright arCookie. All rights reserved.
+*
+*   The license under which the Mob source code is released is the GPLv2 (or later) from the Free Software Foundation.
+*
+*   A copy of the license is included with every copy of Mob source code, but you can also read the text of the license here(http://www.arcookie.com/?page_id=414).
+*
+****************************************************************************************
+*
+*   Copyright AllSeen Alliance. All rights reserved.
+*
+*   Permission to use, copy, modify, and/or distribute this software for any
+*   purpose with or without fee is hereby granted, provided that the above
+*   copyright notice and this permission notice appear in all copies.
+*
+*   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+*   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+*   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+*   ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+*   WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+*   ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+*   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+*/
 
 #include <alljoyn/AllJoynStd.h>
 #include <alljoyn/BusAttachment.h>
@@ -101,17 +111,13 @@ using namespace ajn;
 
 /* constants. */
 static const char* MOB_SERVICE_INTERFACE_NAME = "org.alljoyn.bus.arcookie.mob";
-static const char* NAME_PREFIX = "org.alljoyn.bus.arcookie.mob.";
 static const char* MOB_SERVICE_OBJECT_PATH = "/mobService";
 static const SessionPort MOB_PORT = 27;
 
 /* static data. */
-static ajn::BusAttachment* s_bus = NULL;
 static qcc::String s_advertisedName;
-static qcc::String s_joinName;
 static qcc::String s_sessionHost;
 static SessionId s_sessionId = 0;
-static bool s_joinComplete = false;
 static volatile sig_atomic_t s_interrupt = false;
 static int s_doc_id = 0;
 static int s_user_id = 0;
@@ -149,10 +155,12 @@ BOOL asVector(LPCTSTR sText, int nLength, LPCTSTR cDelimit, std::vector<std::str
 }
 
 /* Bus object */
-class CMobObject : public BusObject {
+class CAlljoynMob;
+
+class CSender : public BusObject {
   public:
 
-    CMobObject(BusAttachment& bus, const char* path) : BusObject(path), mobSignalMember(NULL)
+    CSender(BusAttachment& bus, const char* path) : BusObject(path), mobSignalMember(NULL)
     {
         QStatus status;
 
@@ -167,16 +175,16 @@ class CMobObject : public BusObject {
 
         /* Register signal handler */
         status =  bus.RegisterSignalHandler(this,
-                                            static_cast<MessageReceiver::SignalHandler>(&CMobObject::OnRecvData),
+                                            static_cast<MessageReceiver::SignalHandler>(&CSender::OnRecvData),
                                             mobSignalMember,
                                             NULL);
 
         if (ER_OK != status) {
-            printf("Failed to register signal handler for CMobObject::Mob (%s)\n", QCC_StatusText(status));
+            printf("Failed to register signal handler for CSender::Mob (%s)\n", QCC_StatusText(status));
         }
     }
 
-	~CMobObject(){
+	~CSender(){
 		std::vector<WORKS *>::iterator iter;
 
 		for (iter = m_vWorks.begin(); iter != m_vWorks.end(); iter++) {
@@ -395,36 +403,8 @@ class CMobObject : public BusObject {
 	  const InterfaceDescription::Member* mobSignalMember;
 };
 
-class MyBusListener : public BusListener, public SessionPortListener, public SessionListener {
-    void FoundAdvertisedName(const char* name, TransportMask transport, const char* namePrefix)
-    {
-        printf("FoundAdvertisedName(name='%s', transport = 0x%x, prefix='%s')\n", name, transport, namePrefix);
-
-        if (s_sessionHost.empty()) {
-            const char* convName = name + strlen(NAME_PREFIX);
-            printf("Discovered mob conversation: \"%s\"\n", convName);
-
-            /* Join the conversation */
-            /* Since we are in a callback we must enable concurrent callbacks before calling a synchronous method. */
-            s_sessionHost = name;
-            s_bus->EnableConcurrentCallbacks();
-            SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, true, SessionOpts::PROXIMITY_ANY, TRANSPORT_ANY);
-            QStatus status = s_bus->JoinSession(name, MOB_PORT, this, s_sessionId, opts);
-            if (ER_OK == status) {
-                printf("Joined conversation \"%s\"\n", convName);
-            } else {
-                printf("JoinSession failed (status=%s)\n", QCC_StatusText(status));
-            }
-            uint32_t timeout = 20;
-            status = s_bus->SetLinkTimeout(s_sessionId, timeout);
-            if (ER_OK == status) {
-                printf("Set link timeout to %d\nsqlite> ", timeout);
-            } else {
-                printf("Set link timeout failed\nsqlite> ");
-            }
-            s_joinComplete = true;
-        }
-    }
+class MobBusListener : public BusListener, public SessionPortListener, public SessionListener {
+	void FoundAdvertisedName(const char* name, TransportMask transport, const char* namePrefix);
     void LostAdvertisedName(const char* name, TransportMask transport, const char* namePrefix)
     {
         QCC_UNUSED(namePrefix);
@@ -453,9 +433,9 @@ class MyBusListener : public BusListener, public SessionPortListener, public Ses
 
         s_sessionId = id;
         printf("SessionJoined with %s (id=%d)\n", joiner, id);
-        s_bus->EnableConcurrentCallbacks();
+		m_pBus->EnableConcurrentCallbacks();
         uint32_t timeout = 20;
-        QStatus status = s_bus->SetLinkTimeout(s_sessionId, timeout);
+		QStatus status = m_pBus->SetLinkTimeout(s_sessionId, timeout);
         if (ER_OK == status) {
             printf("Set link timeout to %d\nsqlite> ", timeout);
         } else {
@@ -475,127 +455,67 @@ class MyBusListener : public BusListener, public SessionPortListener, public Ses
 	virtual void SessionMemberRemoved(SessionId sessionId, const char* uniqueName) {
 		printf("SessionMemberRemoved with %s (id=%d)\nsqlite> ", uniqueName, sessionId);
 	}
+
+public:
+	void SetMob(CAlljoynMob * pMob);
+
+private:
+	CAlljoynMob *			m_pMob;
+	ajn::BusAttachment *	m_pBus;
 };
 
-/* More static data. */
-static CMobObject* s_mobObj = NULL;
-static MyBusListener s_busListener;
+class CAlljoynMob {
+public:
+	CAlljoynMob() {
+		m_pBus = NULL;
+		m_pSender = NULL;
+		m_bJoinComplete = false;
+	}
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/** Send usage information to stdout and exit with EXIT_FAILURE. */
-static void Usage()
-{
-    printf("Usage: mob [-h] [-s <name>] | [-j <name>]\n");
-    exit(EXIT_FAILURE);
-}
-
-/** Parse the the command line arguments. If a problem occurs exit via Usage(). */
-static void ParseCommandLine(int argc, char** argv)
-{
-	std::vector<std::string> v;
-
-	/* Parse command line args */
-    for (int i = 1; i < argc; ++i) {
-        if (0 == ::strcmp("-s", argv[i])) {
-            if ((++i < argc) && (argv[i][0] != '-')) {
-				if (asVector(argv[i], strlen(argv[i]), ":", v)) {
-					s_advertisedName = NAME_PREFIX;
-					s_advertisedName += v[0].data();
-					s_doc_id = atoi(v[1].data());
-					s_user_id = atoi(v[2].data());
-					s_user_password = atoi(v[3].data());
-				}
-            } else {
-                printf("Missing parameter for \"-s\" option\n");
-                Usage();
-            }
-        } else if (0 == ::strcmp("-j", argv[i])) {
-            if ((++i < argc) && (argv[i][0] != '-')) {
-				if (asVector(argv[i], strlen(argv[i]), ":", v)) {
-					s_joinName = NAME_PREFIX;
-					s_joinName += v[0].data();
-					s_doc_id = atoi(v[1].data());
-					s_user_id = atoi(v[2].data());
-					s_user_password = atoi(v[3].data());
-				}
-			}
-			else {
-                printf("Missing parameter for \"-j\" option\n");
-                Usage();
-            }
-        } else if (0 == ::strcmp("-h", argv[i])) {
-            Usage();
-        } else {
-            printf("Unknown argument \"%s\"\n", argv[i]);
-            Usage();
-        }
-    }
-}
-
-/** Validate the data obtained from the command line. If invalid exit via Usage(). */
-void ValidateCommandLine()
-{
-    /* Validate command line */
-    if (s_advertisedName.empty() && s_joinName.empty()) {
-        printf("Must specify either -s or -j\n");
-        Usage();
-    } else if (!s_advertisedName.empty() && !s_joinName.empty()) {
-        printf("Cannot specify both -s  and -j\n");
-        Usage();
-    }
-}
-
-/** Take input from stdin and send it as a mob message, continue until an error or
- * SIGINT occurs, return the result status. */
-int alljoyn_connect(int argc, char** argv)
-{
-	/* Install SIGINT handler. */
-	signal(SIGINT, SigIntHandler);
-
-	ParseCommandLine(argc, argv);
-	ValidateCommandLine();
-
-	QStatus status = AllJoynInit();
-
-#ifdef ROUTER
-	if (ER_OK == status) {
-		status = AllJoynRouterInit();
-		if (ER_OK != status) {
-			AllJoynShutdown();
+	~CAlljoynMob() {
+		if (m_pBus) {
+			/* Cleanup */
+			delete m_pBus;
+			m_pBus = NULL;
 		}
 	}
+
+	void SetJoinComplete(bool joinComplete) { m_bJoinComplete = joinComplete; }
+
+	virtual QStatus Init(const char * sJoinName) {
+		QStatus status = AllJoynInit();
+
+#ifdef ROUTER
+		if (ER_OK == status) {
+			status = AllJoynRouterInit();
+			if (ER_OK != status) {
+				AllJoynShutdown();
+			}
+		}
 #endif
 
-	if (ER_OK == status) {
-		/* Create message bus */
-		s_bus = new BusAttachment("mob", true);
+		if ((m_pBus = new BusAttachment("mob", true)) != NULL) {
 
-		if (s_bus) {
+			/* Create org.alljoyn.bus.arcookie.mob interface */
+			InterfaceDescription* mobIntf = NULL;
+
+			status = m_pBus->CreateInterface(MOB_SERVICE_INTERFACE_NAME, mobIntf);
 
 			if (ER_OK == status) {
-				/* Create org.alljoyn.bus.arcookie.mob interface */
-				InterfaceDescription* mobIntf = NULL;
-				
-				status = s_bus->CreateInterface(MOB_SERVICE_INTERFACE_NAME, mobIntf);
-
-				if (ER_OK == status) {
-					mobIntf->AddSignal("mob", "ay", "data", 0);
-					mobIntf->Activate();
-				}
-				else {
-					printf("Failed to create interface \"%s\" (%s)\n", MOB_SERVICE_INTERFACE_NAME, QCC_StatusText(status));
-				}
+				mobIntf->AddSignal("mob", "ay", "data", 0);
+				mobIntf->Activate();
+			}
+			else {
+				printf("Failed to create interface \"%s\" (%s)\n", MOB_SERVICE_INTERFACE_NAME, QCC_StatusText(status));
 			}
 
 			if (ER_OK == status) {
-				s_bus->RegisterBusListener(s_busListener);
+				m_BusListener.SetMob(this);
+				m_pBus->RegisterBusListener(m_BusListener);
 			}
 
 			if (ER_OK == status) {
-				status = s_bus->Start();
+				status = m_pBus->Start();
 
 				if (ER_OK == status) {
 					printf("BusAttachment started.\n");
@@ -606,10 +526,10 @@ int alljoyn_connect(int argc, char** argv)
 			}
 
 			/* Create the bus object that will be used to send and receive signals */
-			s_mobObj = new CMobObject(*s_bus, MOB_SERVICE_OBJECT_PATH);
+			m_pSender = new CSender(*m_pBus, MOB_SERVICE_OBJECT_PATH);
 
 			if (ER_OK == status) {
-				status = s_bus->RegisterBusObject(*s_mobObj);
+				status = m_pBus->RegisterBusObject(*m_pSender);
 
 				if (ER_OK == status) {
 					printf("RegisterBusObject succeeded.\n");
@@ -620,110 +540,181 @@ int alljoyn_connect(int argc, char** argv)
 			}
 
 			if (ER_OK == status) {
-				status = s_bus->Connect();
+				status = m_pBus->Connect();
 
 				if (ER_OK == status) {
-					printf("Connect to '%s' succeeded.\n", s_bus->GetConnectSpec().c_str());
+					printf("Connect to '%s' succeeded.\n", m_pBus->GetConnectSpec().c_str());
 				}
 				else {
-					printf("Failed to connect to '%s' (%s).\n", s_bus->GetConnectSpec().c_str(), QCC_StatusText(status));
-				}
-			}
-
-			/* Advertise or discover based on command line options */
-			if (!s_advertisedName.empty()) {
-				/*
-				* Advertise this service on the bus.
-				* There are three steps to advertising this service on the bus.
-				* 1) Request a well-known name that will be used by the client to discover
-				*    this service.
-				* 2) Create a session.
-				* 3) Advertise the well-known name.
-				*/
-				if (ER_OK == status) {
-					status = s_bus->RequestName(s_advertisedName.c_str(), DBUS_NAME_FLAG_DO_NOT_QUEUE);
-
-					if (ER_OK == status) {
-						printf("RequestName('%s') succeeded.\n", s_advertisedName.c_str());
-					}
-					else {
-						printf("RequestName('%s') failed (status=%s).\n", s_advertisedName.c_str(), QCC_StatusText(status));
-					}
-				}
-
-				const TransportMask SERVICE_TRANSPORT_TYPE = TRANSPORT_ANY;
-
-				if (ER_OK == status) {
-					SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, true, SessionOpts::PROXIMITY_ANY, SERVICE_TRANSPORT_TYPE);
-					SessionPort sp = MOB_PORT;
-					
-					status = s_bus->BindSessionPort(sp, opts, s_busListener);
-
-					if (ER_OK == status) {
-						printf("BindSessionPort succeeded.\n");
-					}
-					else {
-						printf("BindSessionPort failed (%s).\n", QCC_StatusText(status));
-					}
-				}
-
-				if (ER_OK == status) {
-					status = s_bus->AdvertiseName(s_advertisedName.c_str(), SERVICE_TRANSPORT_TYPE);
-
-					if (ER_OK == status) {
-						printf("Advertisement of the service name '%s' succeeded.\n", s_advertisedName.c_str());
-					}
-					else {
-						printf("Failed to advertise name '%s' (%s).\n", s_advertisedName.c_str(), QCC_StatusText(status));
-					}
-				}
-			}
-			else {
-				if (ER_OK == status) {
-					/* Begin discovery on the well-known name of the service to be called */
-					status = s_bus->FindAdvertisedName(s_joinName.c_str());
-
-					if (status == ER_OK) {
-						printf("org.alljoyn.Bus.FindAdvertisedName ('%s') succeeded.\n", s_joinName.c_str());
-					}
-					else {
-						printf("org.alljoyn.Bus.FindAdvertisedName ('%s') failed (%s).\n", s_joinName.c_str(), QCC_StatusText(status));
-					}
-				}
-
-				if (ER_OK == status) {
-					unsigned int count = 0;
-
-					while (!s_joinComplete && !s_interrupt) {
-						if (0 == (count++ % 100)) {
-							printf("Waited %u seconds for JoinSession completion.\n", count / 100);
-						}
-
-#ifdef _WIN32
-						Sleep(10);
-#else
-						usleep(10 * 1000);
-#endif
-					}
-
-					status = (s_joinComplete && !s_interrupt ? ER_OK : ER_ALLJOYN_JOINSESSION_REPLY_CONNECT_FAILED);
+					printf("Failed to connect to '%s' (%s).\n", m_pBus->GetConnectSpec().c_str(), QCC_StatusText(status));
 				}
 			}
 		}
-	}
-	else {
-		status = ER_OUT_OF_MEMORY;
+		return status;
 	}
 
-	return (int)status;
+	QStatus SendData(int nAID, int nAction, int wid, const char * msg, int nLength) {
+		return m_pSender->SendData(nAID, nAction, wid, msg, nLength);
+	}
+
+	ajn::BusAttachment *	m_pBus;
+	CSender*				m_pSender;
+	MobBusListener			m_BusListener;
+	bool					m_bJoinComplete;
+};
+
+class CMobClient : public CAlljoynMob {
+public:
+	CMobClient() {}
+
+	virtual QStatus Init(const char * sJoinName) {
+		QStatus status = CAlljoynMob::Init(NULL);
+
+		if (ER_OK == status) {
+			/* Begin discovery on the well-known name of the service to be called */
+			status = m_pBus->FindAdvertisedName(sJoinName);
+
+			if (status == ER_OK) {
+				printf("org.alljoyn.Bus.FindAdvertisedName ('%s') succeeded.\n", sJoinName);
+			}
+			else {
+				printf("org.alljoyn.Bus.FindAdvertisedName ('%s') failed (%s).\n", sJoinName, QCC_StatusText(status));
+			}
+		}
+
+		if (ER_OK == status) {
+			unsigned int count = 0;
+
+			while (!m_bJoinComplete && !s_interrupt) {
+				if (0 == (count++ % 100)) {
+					printf("Waited %u seconds for JoinSession completion.\n", count / 100);
+				}
+
+#ifdef _WIN32
+				Sleep(10);
+#else
+				usleep(10 * 1000);
+#endif
+			}
+		}
+
+		return (m_bJoinComplete && !s_interrupt ? ER_OK : ER_ALLJOYN_JOINSESSION_REPLY_CONNECT_FAILED);
+	}
+};
+
+class CMobServer : public CAlljoynMob {
+public:
+	CMobServer() {}
+	virtual QStatus Init(const char * sAdvertiseName) {
+		QStatus status = CAlljoynMob::Init(NULL);
+
+		if (ER_OK == status) {
+			status = m_pBus->RequestName(sAdvertiseName, DBUS_NAME_FLAG_DO_NOT_QUEUE);
+
+			if (ER_OK == status) {
+				printf("RequestName('%s') succeeded.\n", sAdvertiseName);
+			}
+			else {
+				printf("RequestName('%s') failed (status=%s).\n", sAdvertiseName, QCC_StatusText(status));
+			}
+		}
+
+		const TransportMask SERVICE_TRANSPORT_TYPE = TRANSPORT_ANY;
+
+		if (ER_OK == status) {
+			SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, true, SessionOpts::PROXIMITY_ANY, SERVICE_TRANSPORT_TYPE);
+			SessionPort sp = MOB_PORT;
+
+			status = m_pBus->BindSessionPort(sp, opts, m_BusListener);
+
+			if (ER_OK == status) {
+				printf("BindSessionPort succeeded.\n");
+			}
+			else {
+				printf("BindSessionPort failed (%s).\n", QCC_StatusText(status));
+			}
+		}
+
+		if (ER_OK == status) {
+			status = m_pBus->AdvertiseName(sAdvertiseName, SERVICE_TRANSPORT_TYPE);
+
+			if (ER_OK == status) {
+				printf("Advertisement of the service name '%s' succeeded.\n", sAdvertiseName);
+			}
+			else {
+				printf("Failed to advertise name '%s' (%s).\n", sAdvertiseName, QCC_StatusText(status));
+			}
+		}
+		return status;
+	}
+};
+
+CAlljoynMob * gpMob = NULL;
+
+void MobBusListener::SetMob(CAlljoynMob * pMob) 
+{
+	m_pBus = pMob->m_pBus;
+	m_pMob = pMob; 
+}
+
+void MobBusListener::FoundAdvertisedName(const char* name, TransportMask transport, const char* namePrefix)
+{
+	printf("FoundAdvertisedName(name='%s', transport = 0x%x, prefix='%s')\n", name, transport, namePrefix);
+
+	if (s_sessionHost.empty()) {
+		const char* convName = name + strlen(NAME_PREFIX);
+		printf("Discovered mob conversation: \"%s\"\n", convName);
+
+		/* Join the conversation */
+		/* Since we are in a callback we must enable concurrent callbacks before calling a synchronous method. */
+		s_sessionHost = name;
+		m_pBus->EnableConcurrentCallbacks();
+		SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, true, SessionOpts::PROXIMITY_ANY, TRANSPORT_ANY);
+		QStatus status = m_pBus->JoinSession(name, MOB_PORT, this, s_sessionId, opts);
+		if (ER_OK == status) {
+			printf("Joined conversation \"%s\"\n", convName);
+		}
+		else {
+			printf("JoinSession failed (status=%s)\n", QCC_StatusText(status));
+		}
+		uint32_t timeout = 20;
+		status = m_pBus->SetLinkTimeout(s_sessionId, timeout);
+		if (ER_OK == status) {
+			printf("Set link timeout to %d\nsqlite> ", timeout);
+		}
+		else {
+			printf("Set link timeout failed\nsqlite> ");
+		}
+		m_pMob->SetJoinComplete(true);
+	}
+}
+
+/** Take input from stdin and send it as a mob message, continue until an error or
+ * SIGINT occurs, return the result status. */
+int alljoyn_connect(const char * advertisedName, const char * joinName)
+{
+	/* Install SIGINT handler. */
+	signal(SIGINT, SigIntHandler);
+
+	if (advertisedName) {
+		s_doc_id = 1;
+		s_user_id = 1;
+		gpMob = new CMobServer();
+		return gpMob->Init(advertisedName);
+	}
+	else {
+		s_doc_id = 1;
+		s_user_id = 2;
+		gpMob = new CMobClient();
+		return gpMob->Init(joinName);
+	}
 }
 
 void alljoyn_disconnect(void)
 {
-	if (s_bus) {
-		/* Cleanup */
-		delete s_bus;
-		s_bus = NULL;
+	if (gpMob) {
+		delete gpMob;
+		gpMob = NULL;
 	}
 
 #ifdef ROUTER
@@ -735,7 +726,7 @@ void alljoyn_disconnect(void)
 int alljoyn_send(int nDocID, char * sText, int nLength)
 {
 	time_t aid = time(NULL);
-	int ret = s_mobObj->SendData(aid, ACT_DATA, nDocID, sText, nLength);
+	int ret = gpMob->SendData(aid, ACT_DATA, nDocID, sText, nLength);
 
 	if (ER_OK == ret) {
 		int len = 0, l;
@@ -761,7 +752,7 @@ int alljoyn_send(int nDocID, char * sText, int nLength)
 			}
 			else p++;
 		}
-		if (len > 0) ret = s_mobObj->SendData(aid, ACT_FLIST, nDocID, data, len);
+		if (len > 0) ret = gpMob->SendData(aid, ACT_FLIST, nDocID, data, len);
 	}
 
 	return ret;
@@ -786,7 +777,3 @@ int alljoyn_is_server()
 {
 	return s_advertisedName.empty() ? 0 : 1;
 }
-
-#ifdef __cplusplus
-}
-#endif
