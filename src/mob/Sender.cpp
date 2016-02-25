@@ -370,6 +370,20 @@ void CHncWebCtrl::CheckMissing()
 
 */
 
+struct find_id : std::unary_function<monster, bool> {
+	int snum;
+	std::string uid;
+	find_id(const char * u, int sn) :uid(u), snum(sn) { }
+	bool operator()(monster const& m) const {
+		return (m.uid == uid && m.snum == snum);
+	}
+};
+
+void CSender::Find(const char * sUID, int nSNum)
+{
+	it = std::find_if(m_vReceives.begin(), m_vReceives.end(), find_id(sUID, nSNum));
+}
+
 /** Receive a signal from another mob client */
 void CSender::OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg)
 {
