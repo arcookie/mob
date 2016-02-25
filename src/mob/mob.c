@@ -85,8 +85,10 @@ int mob_apply(int wid, const char * uid, int snum, const char * sql)
 	// 누락이 없으면 순서대로 바로 소진(data 는 테이블에 남지 않는다.)
 
 	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main FROM works WHERE num=%d", wid),
-		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), sql, 0, 0, 0);
-		mob_sync_db((sqlite3 *)sqlite3_column_int64(pStmt, 0), uid, snum);
+		sqlite3 * pDB = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
+
+		sqlite3_exec(pDB, sql, 0, 0, 0);
+		mob_sync_db(pDB, uid, snum);
 		break;
 	);
 	return 0;
