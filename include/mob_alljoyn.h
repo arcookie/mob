@@ -23,11 +23,8 @@ extern "C" {
 
 	int alljoyn_send(int nDocID, char * sText, int nLength);
 
-	int alljoyn_is_server();
-
-	int alljoyn_doc_id();
-	int alljoyn_user_id();
-	const char * alljoyn_user_password();
+	int alljoyn_session_id();
+	const char * alljoyn_join_name();
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */

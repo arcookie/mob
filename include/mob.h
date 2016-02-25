@@ -13,8 +13,8 @@ extern "C" {
 
 	int mob_init(int argc, char** argv);
 	int mob_open_db(const char *zFilename, sqlite3 **ppDb);
-	int mob_sync_db(sqlite3 * pDb, int end, int uid, int snum);
-	int mob_apply(int wid, int uid, int snum, const char * sql);
+	int mob_sync_db(sqlite3 * pDb, const char * uid, int snum);
+	int mob_apply(int wid, const char * uid, int snum, const char * sql);
 	int mob_close_db(sqlite3 * pDb);
 	void mob_exit(void);
 
