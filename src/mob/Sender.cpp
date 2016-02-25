@@ -129,6 +129,246 @@ const std::string & CSender::Save(int nDocID, const char * sText, int nLength, s
 
 	return out;
 }
+/*
+
+const Value & CHncWebCtrl::GetSNumList(CHncSQLite & dbWork, LPCTSTR sTable, int nUID, Value & jData, BOOL & bMissed)
+{
+	int n = 1;
+	Value jWork;
+	CString s, sHaving = _T("");
+
+	bMissed = FALSE;
+
+	if (dbWork.VQuerySQL(jWork, _T("SELECT snum FROM %s WHERE uid = %d AND snum >= 0 ORDER BY snum"), sTable, nUID)) {
+		map<int, int>::iterator iter;
+
+		if ((iter = m_mMissing.find(nUID)) != m_mMissing.end()) {
+			if (iter->second < jWork[0]["snum"].asInt()) {
+				int k = iter->second;
+				int snum0 = jWork[0]["snum"].asInt();
+
+				while (k < snum0) {
+					s.Format(_T("%s%d"), sHaving.IsEmpty() ? _T("") : _T(","), k++);
+					sHaving += s;
+				}
+				bMissed = TRUE;
+			}
+			m_mMissing.erase(iter);
+		}
+
+		int i = -1, cnt = jWork.size(), e;
+
+		while (++i < cnt) {
+			n = (jWork[i]["snum"].asInt() + 1);
+			if (i < cnt - 1 && (e = jWork[i + 1]["snum"].asInt()) != n) {
+				bMissed = TRUE;
+				while (n < e) {
+					s.Format(_T("%s%d"), sHaving.IsEmpty() ? _T("") : _T(","), n++);
+					sHaving += s;
+				}
+			}
+		}
+	}
+
+	s.Format(_T("%s%d"), sHaving.IsEmpty() ? _T("") : _T(","), n);
+	sHaving += s;
+
+	jData["__having__"] = (LPCTSTR)sHaving;
+	jData["__last__"] = n;
+
+	return jData;
+}
+
+BOOL CHncWebCtrl::CollectMissing(CHncSQLite & dbWork, LPCTSTR sTable, int nUID, Value & jData, string & sUIDList)
+{
+	CString s;
+	BOOL bMissed = FALSE, bFlag;
+	Value jWork;
+
+	sUIDList = _T("");
+
+	if (dbWork.VQuerySQL(jWork, _T("SELECT num FROM member WHERE num <> %d ORDER BY num"), nUID)) {
+		int i = -1, cnt = jWork.size(), uid;
+
+		while (++i < cnt) {
+			uid = jWork[i]["num"].asInt();
+			jData["__data__"]["__snum_list__"][jWork[i]["num"].asCString()] = GetSNumList(dbWork, sTable, uid, Value(), bFlag);
+			if (bFlag) {
+				s.Format(_T("%d|"), uid);
+				sUIDList += s;
+				bMissed = TRUE;
+			}
+		}
+	}
+	return bMissed;
+}
+
+BOOL CHncWebCtrl::MissingCheck(LPCTSTR sTable)
+{
+	string sUIDList;
+	Value jData, jSetting;
+	int nDocID = get_docid(GetSafeHwnd());
+	CHncSQLite & dbWork = get_dbwork(nDocID);
+	int nUID = GetUserID(nDocID);
+
+	if (CollectMissing(dbWork, sTable, nUID, jData, sUIDList)) {
+		jData["__work__"] = _T("send_chat");
+		jData["__type__"] = 1;
+		jData["__local_wid__"] = nDocID;
+		jData["__data__"]["__table__"] = sTable;
+		jData["__data__"]["__uid_list__"] = sUIDList;
+
+		m_wObj.SaveWork(jData);
+
+		m_wObj.SendMain();
+
+		return TRUE;
+	}
+	return FALSE;
+}
+
+
+LPSTR CHncWebCtrl::Apply(int nDocID) 
+{
+#define MISSING_RETURN	if (snum > 1 && !dbWork.VQuerySQL(Value(), _T("SELECT num FROM working WHERE uid=%s AND snum=%d"), jData[0L]["uid"].asCString(), snum - 1)) { LOG("누락 발생: uid - %s , snum - %d 없음", jData[0L]["uid"].asCString(), snum - 1); return (LPSTR)m_sApplyData.data(); }
+
+	m_sApplyData = _T("");
+
+	KillTimer(TM_APPLY_WORK_REPEAT);
+
+	if (nDocID > 0) {
+		Value jData;
+		CString  sSQL;
+		int nUID = GetUserID(nDocID);
+		CHncSQLite & dbWork = get_dbwork(nDocID);
+
+		if (gAppID == AID_HSHOW) sSQL.Format(_T("SELECT num, uid, snum, uri FROM working WHERE receivers LIKE '%%%d|%%' ORDER BY uid DESC, snum ASC LIMIT 1"), nUID);
+		else sSQL.Format(_T("SELECT num, uid, snum, uri FROM working WHERE receivers LIKE '%%%d|%%' ORDER BY uid, snum LIMIT 1"), nUID);
+
+		if (dbWork.QuerySQL(jData, sSQL)) {
+			int num = jData[0L]["num"].asInt();
+			int snum = jData[0L]["snum"].asInt();
+			string s0, uids = jData[0L]["uid"].asString() + "|";
+			int uid = get_int(jData[0L]["uri"].asString(), "uid=", " AND", -1);
+
+#ifdef HCC_REPLAY
+			if (!IsInReplaying()) {
+#endif
+				MISSING_RETURN;
+
+				while (uid > 0 && dbWork.VQuerySQL(jData, _T("SELECT num, uid, snum, uri FROM working WHERE uid=%d AND receivers LIKE '%%%d|%%' ORDER BY snum LIMIT 1"), uid, nUID)) {
+					snum = jData[0L]["snum"].asInt();
+
+					MISSING_RETURN;
+
+					s0 = jData[0L]["uid"].asString() + "|";
+					if (uids.find(s0) == string::npos) {
+						uids += s0;
+						uid = get_int(jData[0L]["uri"].asString(), "uid=", " AND", -1);
+						num = jData[0L]["num"].asInt();
+					}
+					else break;
+				}
+
+				sSQL.Format(_T("SELECT num, snum, uid, type, uri, vid, receivers, title FROM working WHERE num = %d"), num);
+#ifdef HCC_REPLAY
+			}
+			else {
+				if (!GetRecordKey(jData)) return (LPSTR)m_sApplyData.data();
+				else {
+					uid = jData[0L]["uid"].asInt();
+					snum = jData[0L]["snum"].asInt();
+					sSQL.Format(_T("SELECT num, snum, uid, type, uri, vid, receivers, title FROM working WHERE uid = %d AND snum = %d"), uid, snum);
+				}
+			}
+#endif
+
+			if (dbWork.QuerySQL(jData, sSQL)) {
+				FastWriter writer;
+				CString s, sFiles;
+				const Value & jRow = jData[0L];
+				CHncCommData & commData = get_comm_data(nDocID);
+
+				uid = jRow["uid"].asInt();
+				num = jRow["num"].asInt();
+				snum = jRow["snum"].asInt();
+
+				LOG("오피스에 반영: uid - %d , snum - %d", uid, snum);
+
+#ifdef HCC_REPLAY
+				if (IsInRecording()) RecordSNum(uid, snum);
+#endif
+
+				Json::Value jFiles;
+
+#ifdef HCC_REPLAY
+				if (IsInReplaying()) GetRecordedFiles(uid, snum, jFiles);
+				else 
+#endif
+				jFiles = commData.GetFiles(num);
+
+				if (jFiles.isArray() && jFiles.size() > 0) {
+					if (!jRow["vid"].asString().empty()) download_files(jFiles);
+					sFiles = writer.write(jFiles).data();
+#ifdef HCC_REPLAY
+					if (IsInRecording()) RecordFiles(uid, snum, jFiles);
+#endif
+				}
+				else sFiles = _T("[]");
+
+				s.Format(_T("{\"__type__\":%d,\"__uid_from__\":%d,\"__num__\":%d,\"__snum__\":%d,\"__uri__\":\"uid=%d AND snum=%d\",\"__title__\":\"%s\",\"__data__\":"),
+					jRow["type"].asInt(), uid, num, snum, uid, snum, jRow["title"].asCString());
+
+				m_sApplyData = s;
+				m_sApplyData += writer.write(commData.GetData(num));
+				m_sApplyData += _T(",\"__files__\":");
+				m_sApplyData += sFiles;
+				m_sApplyData += _T("} ");
+			}
+		}
+		return (LPSTR)m_sApplyData.data();
+
+#undef MISSING_RETURN
+	}
+}
+
+void CHncWebCtrl::CheckMissing() 
+{
+	int nDocID = get_docid(GetSafeHwnd());
+
+	if (nDocID > 0) {
+		Value jWork;
+		int nUID = GetUserID(nDocID);
+		CHncSQLite & dbWork = get_dbwork(nDocID);
+
+		KillTimer(TM_SEND_WORK_SLIST);
+
+		if (dbWork.VQuerySQL(jWork, _T("SELECT uid, snum FROM working WHERE receivers LIKE '%%%d|%%'"), nUID)) {
+			int uid, snum, i = -1, cnt = jWork.size();
+
+			while (++i < cnt) {
+				const Value & jRow = jWork[i];
+
+				uid = jRow["uid"].asInt();
+				snum = jRow["snum"].asInt() - 1;
+
+				if (snum > 0 && !dbWork.VQuerySQL(Value(), _T("SELECT num FROM working WHERE uid=%d AND snum=%d"), uid, snum)) {
+					map<int, int>::iterator iter2;
+
+					if ((iter2 = m_mMissing.find(uid)) != m_mMissing.end()) {
+						if (iter2->second > snum) m_mMissing[uid] = snum;
+					}
+					else m_mMissing[uid] = snum;
+
+					SetTimer(TM_SEND_WORK_SLIST, 3000, 0);
+					return;
+				}
+			}
+		}
+	}
+}
+
+*/
 
 /** Receive a signal from another mob client */
 void CSender::OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg)
@@ -210,6 +450,15 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 					// apply 하고 머지후 전달할것.
 
 					Save(_iter->second.wid, _iter->second.body, _iter->second.length, s);
+// if missing is exist do this timer work.
+//			case TM_SEND_WORK_SLIST:
+	//			MissingCheck(_T("working"));
+		//		break;
+			//case TM_CHECK_MISSING:
+			//	CheckMissing();
+			//	break;
+					//KillTimer(hWnd, TM_CHECK_MISSING);
+					//SetTimer(hWnd, TM_CHECK_MISSING, 100, NULL);
 
 					std::vector<WORKS *>::iterator __iter;
 
