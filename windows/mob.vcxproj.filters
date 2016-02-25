@@ -24,12 +24,6 @@
     <ClCompile Include="..\src\mob\sqldiff.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\util.c">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\mob\alljoyn.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\mob\AlljoynMob.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>

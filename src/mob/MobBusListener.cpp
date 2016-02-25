@@ -24,20 +24,11 @@
 *   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#include "mob.h"
 #include "MobBusListener.h"
 #include "MobClient.h"
 
 
-void MobBusListener::LostAdvertisedName(const char* name, TransportMask transport, const char* namePrefix)
-{
-	QCC_UNUSED(namePrefix);
-	printf("Got LostAdvertisedName for %s from transport 0x%x\nsqlite> ", name, transport);
-}
-void MobBusListener::NameOwnerChanged(const char* busName, const char* previousOwner, const char* newOwner)
-{
-	printf("NameOwnerChanged: name=%s, oldOwner=%s, newOwner=%s\nsqlite> ", busName, previousOwner ? previousOwner : "<none>",
-		newOwner ? newOwner : "<none>");
-}
 bool MobBusListener::AcceptSessionJoiner(SessionPort sessionPort, const char* joiner, const SessionOpts& opts)
 {
 	if (sessionPort != MOB_PORT) {
@@ -48,21 +39,6 @@ bool MobBusListener::AcceptSessionJoiner(SessionPort sessionPort, const char* jo
 	printf("Accepting join session request from %s (opts.proximity=%x, opts.traffic=%x, opts.transports=%x)\nsqlite> ",
 		joiner, opts.proximity, opts.traffic, opts.transports);
 	return true;
-}
-
-void MobBusListener::SessionMemberAdded(SessionId sessionId, const char* uniqueName) {
-	printf("SessionMemberAdded with %s (id=%d)\nsqlite> ", uniqueName, sessionId);
-}
-
-void MobBusListener::SessionMemberRemoved(SessionId sessionId, const char* uniqueName) {
-	printf("SessionMemberRemoved with %s (id=%d)\nsqlite> ", uniqueName, sessionId);
-}
-
-
-void MobBusListener::SetMob(CAlljoynMob * pMob)
-{
-	m_pBus = pMob->m_pBus;
-	m_pMob = pMob;
 }
 
 void MobBusListener::FoundAdvertisedName(const char* name, TransportMask transport, const char* namePrefix)
@@ -79,9 +55,9 @@ void MobBusListener::FoundAdvertisedName(const char* name, TransportMask transpo
 		/* Join the conversation */
 		/* Since we are in a callback we must enable concurrent callbacks before calling a synchronous method. */
 		pMob->SetSessionHost(name);
-		m_pBus->EnableConcurrentCallbacks();
+		pMob->EnableConcurrentCallbacks();
 		SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, true, SessionOpts::PROXIMITY_ANY, TRANSPORT_ANY);
-		QStatus status = m_pBus->JoinSession(name, MOB_PORT, this, id, opts);
+		QStatus status = pMob->JoinSession(name, MOB_PORT, this, id, opts);
 		if (ER_OK == status) {
 			m_pMob->SetSessionID(id);
 			printf("Joined conversation \"%s\"\n", convName);
@@ -90,7 +66,7 @@ void MobBusListener::FoundAdvertisedName(const char* name, TransportMask transpo
 			printf("JoinSession failed (status=%s)\n", QCC_StatusText(status));
 		}
 		uint32_t timeout = 20;
-		status = m_pBus->SetLinkTimeout(m_pMob->GetSessionID(), timeout);
+		status = pMob->SetLinkTimeout(m_pMob->GetSessionID(), timeout);
 		if (ER_OK == status) {
 			printf("Set link timeout to %d\nsqlite> ", timeout);
 		}
@@ -101,15 +77,15 @@ void MobBusListener::FoundAdvertisedName(const char* name, TransportMask transpo
 	}
 }
 
-void MobBusListener::SessionJoined(SessionPort sessionPort, SessionId id, const char* joiner)
+void MobBusListener::SessionJoined(SessionPort /*sessionPort*/, SessionId id, const char* joiner)
 {
-	QCC_UNUSED(sessionPort);
+	m_pMob->SetSessionID(id);
+	m_pMob->SetJoinName(joiner);
 
-	m_pMob->SetJoinInfo(id, joiner);
 	printf("SessionJoined with %s (id=%d)\n", joiner, id);
-	m_pBus->EnableConcurrentCallbacks();
+	m_pMob->EnableConcurrentCallbacks();
 	uint32_t timeout = 20;
-	QStatus status = m_pBus->SetLinkTimeout(m_pMob->GetSessionID(), timeout);
+	QStatus status = m_pMob->SetLinkTimeout(m_pMob->GetSessionID(), timeout);
 	if (ER_OK == status) {
 		printf("Set link timeout to %d\nsqlite> ", timeout);
 	}

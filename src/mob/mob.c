@@ -8,11 +8,10 @@
 *   A copy of the license is included with every copy of Mob source code, but you can also read the text of the license here(http://www.arcookie.com/?page_id=414).
 */
 
-#include "mob.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "util.h"
-#include "mob_alljoyn.h"
+
+#include "mob.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // defines
@@ -182,17 +181,16 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 
 int mob_sync_db(sqlite3 * pDb, char * uid, int snum)
 {
-	Str base, undo, redo, bak;
+	Str base, undo, redo;
 	sqlite3_stmt *pStmt = NULL;
 
 	strInit(&undo);
 	strInit(&redo);
-	strInit(&bak);
 	strInit(&base);
 
-	strPrintf(&bak, "%ld_bak.db3", (long)pDb);
+	char * bak = sqlite3_mprintf("%ld_bak.db3", (long)pDb);
 
-	get_diff(pDb, bak.z, &base, &redo, &undo);
+	get_diff(pDb, bak, &base, &redo, &undo);
 
 	if (redo.z){
 		if (!uid) {
@@ -227,7 +225,7 @@ int mob_sync_db(sqlite3 * pDb, char * uid, int snum)
 	strFree(&redo);
 	strFree(&undo);
 	strFree(&base);
-	strFree(&bak);
+	sqlite3_free(&bak);
 
 	return 0;
 }
@@ -235,14 +233,13 @@ int mob_sync_db(sqlite3 * pDb, char * uid, int snum)
 int mob_close_db(sqlite3 * pDb)
 {
 	if (master_db) {
-		long id = (long)pDb;
 		sqlite3_stmt *pStmt = NULL;
 
 		sqlite3_exec(pDb, "DETACH aux;", 0, 0, 0);
 
 		QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_back, ptr_undo FROM works WHERE ptr_main = %ld;", (long)pDb),
-			_close_db(id, "bak", (sqlite3 *)sqlite3_column_int64(pStmt, 0));
-			_close_db(id, "undo", (sqlite3 *)sqlite3_column_int64(pStmt, 1));
+			_close_db((long)pDb, "bak", (sqlite3 *)sqlite3_column_int64(pStmt, 0));
+			_close_db((long)pDb, "undo", (sqlite3 *)sqlite3_column_int64(pStmt, 1));
 		);
 
 		EXECUTE_SQL_V(master_db, ("DELETE FROM works WHERE ptr_main = %ld;", (long)pDb));

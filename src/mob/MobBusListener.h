@@ -35,19 +35,27 @@ class CAlljoynMob;
 
 class MobBusListener : public BusListener, public SessionPortListener, public SessionListener {
 public:
-	void SetMob(CAlljoynMob * pMob);
-	void LostAdvertisedName(const char* name, TransportMask transport, const char* namePrefix);
-	void FoundAdvertisedName(const char* name, TransportMask transport, const char* namePrefix);
-	void NameOwnerChanged(const char* busName, const char* previousOwner, const char* newOwner);
-	bool AcceptSessionJoiner(SessionPort sessionPort, const char* joiner, const SessionOpts& opts);
 	void SessionJoined(SessionPort sessionPort, SessionId id, const char* joiner);
+	void FoundAdvertisedName(const char* name, TransportMask transport, const char* namePrefix);
+	bool AcceptSessionJoiner(SessionPort sessionPort, const char* joiner, const SessionOpts& opts);
 
-	virtual void SessionMemberAdded(SessionId sessionId, const char* uniqueName);
-	virtual void SessionMemberRemoved(SessionId sessionId, const char* uniqueName);
+	void SetMob(CAlljoynMob * pMob) { m_pMob = pMob; }
+	void LostAdvertisedName(const char* name, TransportMask transport, const char* /*namePrefix*/) {
+		printf("Got LostAdvertisedName for %s from transport 0x%x\nsqlite> ", name, transport);
+	}
+	void NameOwnerChanged(const char* busName, const char* previousOwner, const char* newOwner)	{
+		printf("NameOwnerChanged: name=%s, oldOwner=%s, newOwner=%s\nsqlite> ", busName, previousOwner ? previousOwner : "<none>",
+			newOwner ? newOwner : "<none>");
+	}
+	virtual void SessionMemberAdded(SessionId sessionId, const char* uniqueName) {
+		printf("SessionMemberAdded with %s (id=%d)\nsqlite> ", uniqueName, sessionId);
+	}
+	virtual void SessionMemberRemoved(SessionId sessionId, const char* uniqueName) {
+		printf("SessionMemberRemoved with %s (id=%d)\nsqlite> ", uniqueName, sessionId);
+	}
 
 private:
 	CAlljoynMob *			m_pMob;
-	ajn::BusAttachment *	m_pBus;
 };
 
 #endif /* _MOB_BUS_LISTENER_H_ */

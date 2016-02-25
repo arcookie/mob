@@ -127,8 +127,8 @@ public:
 	const std::string & Save(int nDocID, const char * sText, int nLength, std::string & out);
 	/** Receive a signal from another mob client */
 	void OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg);
-	virtual void GetProp(const InterfaceDescription::Member* member, Message& msg);
-	virtual void SetProp(const InterfaceDescription::Member* member, Message& msg);
+	virtual void GetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}
+	virtual void SetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}
 
 private:
 	CAlljoynMob *						m_pMob;

@@ -230,18 +230,6 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 	}
 }
 
-void CSender::GetProp(const InterfaceDescription::Member* member, Message& msg)
-{
-	QCC_UNUSED(member);
-	QCC_UNUSED(msg);
-}
-
-void CSender::SetProp(const InterfaceDescription::Member* member, Message& msg)
-{
-	QCC_UNUSED(member);
-	QCC_UNUSED(msg);
-}
-
 QStatus CSender::_Send(int nChain, const char * pData, int nLength)
 {
 	uint8_t flags = 0;

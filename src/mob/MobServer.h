@@ -29,7 +29,6 @@
 
 #include "AlljoynMob.h"
 
-
 class CMobServer : public CAlljoynMob {
 public:
 	CMobServer() {}

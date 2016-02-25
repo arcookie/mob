@@ -30,14 +30,12 @@
 
 #include <alljoyn/BusAttachment.h>
 
+#include "Sender.h"
 #include "MobBusListener.h"
-
-using namespace ajn;
 
 #define MOB_SERVICE_INTERFACE_NAME "org.alljoyn.bus.arcookie.mob"
 #define MOB_SERVICE_OBJECT_PATH "/mobService"
 #define MOB_PORT 27
-#define NAME_PREFIX	"org.alljoyn.bus.arcookie.mob."
 
 class CSender;
 
@@ -48,14 +46,21 @@ public:
 
 	virtual QStatus Init(const char * sJoinName);
 
-	QStatus SendData(int nAID, int nAction, int wid, const char * msg, int nLength);
+	QStatus SendData(int nAID, int nAction, int wid, const char * msg, int nLength) { return m_pSender->SendData(nAID, nAction, wid, msg, nLength); }
 
-	void SetJoinInfo(SessionId id, const char * joiner);
+	const char * GetJoinName() { return m_sJoiner.data(); }
+	void SetJoinName(const char * name) { m_sJoiner = name; }
 
-	const char * GetJoinName();
-	SessionId GetSessionID();
-	void SetSessionID(SessionId id);
+	SessionId GetSessionID() { return m_nSessionID; }
+	void SetSessionID(SessionId id) { m_nSessionID = id; }
 
+	void EnableConcurrentCallbacks() { m_pBus->EnableConcurrentCallbacks(); }
+	QStatus JoinSession(const char* sessionHost, SessionPort sessionPort, SessionListener* listener, SessionId& sessionId, SessionOpts& opts) {
+		return m_pBus->JoinSession(sessionHost, sessionPort, listener, sessionId, opts);
+	}
+	QStatus SetLinkTimeout(SessionId sessionid, uint32_t& linkTimeout) { return m_pBus->SetLinkTimeout(sessionid, linkTimeout); }
+
+protected:
 	ajn::BusAttachment *	m_pBus;
 	CSender*				m_pSender;
 	qcc::String				m_sJoiner;

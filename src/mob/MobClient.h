@@ -28,21 +28,23 @@
 #define _MOB_CLIENT_H_
 
 #include <signal.h>
-
 #include "AlljoynMob.h"
-
 
 class CMobClient : public CAlljoynMob {
 public:
-	CMobClient();
+	CMobClient() { m_bJoinComplete = false; }
 
 	virtual QStatus Init(const char * sJoinName);
-	void SetJoinComplete(bool joinComplete);
-	const char * GetSessionHost();
-	void SetSessionHost(const char* name);
 
+	void SetSessionHost(const char* name) { m_sSessionHost = name; }
+	void SetJoinComplete(bool joinComplete) { m_bJoinComplete = joinComplete; }
+	const char * GetSessionHost() { return (m_sSessionHost.empty() ? NULL : m_sSessionHost.data()); }
+
+private:
 	qcc::String m_sSessionHost;
 	bool		m_bJoinComplete;
+
+public:
 	static volatile sig_atomic_t s_interrupt;
 };
 

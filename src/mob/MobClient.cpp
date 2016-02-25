@@ -28,14 +28,9 @@
 
 volatile sig_atomic_t CMobClient::s_interrupt = false;
 
-void CDECL_CALL SigIntHandler(int sig)
+void CDECL_CALL SigIntHandler(int /*sig*/)
 {
-	QCC_UNUSED(sig);
 	CMobClient::s_interrupt = true;
-}
-
-CMobClient::CMobClient() {
-	m_bJoinComplete = false;
 }
 
 QStatus CMobClient::Init(const char * sJoinName)
@@ -75,19 +70,3 @@ QStatus CMobClient::Init(const char * sJoinName)
 
 	return (m_bJoinComplete && !s_interrupt ? ER_OK : ER_ALLJOYN_JOINSESSION_REPLY_CONNECT_FAILED);
 }
-
-void CMobClient::SetJoinComplete(bool joinComplete) 
-{
-	m_bJoinComplete = joinComplete; 
-}
-
-const char * CMobClient::GetSessionHost() 
-{
-	return (m_sSessionHost.empty() ? NULL : m_sSessionHost.data()); 
-}
-
-void CMobClient::SetSessionHost(const char* name)
-{
-	m_sSessionHost = name; 
-}
-

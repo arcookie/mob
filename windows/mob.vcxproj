@@ -87,7 +87,6 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\mob\alljoyn.cpp" />
     <ClCompile Include="..\src\mob\AlljoynMob.cpp" />
     <ClCompile Include="..\src\mob\mob.c" />
     <ClCompile Include="..\src\mob\MobBusListener.cpp" />
@@ -95,7 +94,6 @@
     <ClCompile Include="..\src\mob\MobServer.cpp" />
     <ClCompile Include="..\src\mob\Sender.cpp" />
     <ClCompile Include="..\src\mob\sqldiff.c" />
-    <ClCompile Include="..\src\mob\util.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\mob\AlljoynMob.h" />

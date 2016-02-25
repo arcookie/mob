@@ -24,11 +24,14 @@
 *   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#include <time.h>
 #include <alljoyn/Init.h>
-#include "Sender.h"
-#include "AlljoynMob.h"
+#include "mob.h"
+#include "MobClient.h"
+#include "MobServer.h"
 #include "MobBusListener.h"
 
+CAlljoynMob * gpMob = NULL;
 
 CAlljoynMob::CAlljoynMob() 
 {
@@ -117,28 +120,94 @@ QStatus CAlljoynMob::Init(const char * sJoinName)
 	return status;
 }
 
-QStatus CAlljoynMob::SendData(int nAID, int nAction, int wid, const char * msg, int nLength) 
+char * get_file_path(const char * path)
 {
-	return m_pSender->SendData(nAID, nAction, wid, msg, nLength);
+	return 0;
 }
 
-void CAlljoynMob::SetJoinInfo(SessionId id, const char * joiner) 
+int get_file_mtime(const char * path)
 {
-	m_nSessionID = id;
-	m_sJoiner = joiner;
+	return 0;
 }
 
-const char * CAlljoynMob::GetJoinName() 
+long long get_file_length(const char * path)
 {
-	return m_sJoiner.data(); 
+	return 0L;
 }
 
-SessionId CAlljoynMob::GetSessionID() 
+/** Take input from stdin and send it as a mob message, continue until an error or
+* SIGINT occurs, return the result status. */
+int alljoyn_connect(const char * advertisedName, const char * joinName)
 {
-	return m_nSessionID; 
+	if (advertisedName) {
+		gpMob = new CMobServer();
+		return gpMob->Init(advertisedName);
+	}
+	else {
+		gpMob = new CMobClient();
+		return gpMob->Init(joinName);
+	}
 }
 
-void CAlljoynMob::SetSessionID(SessionId id) 
+void alljoyn_disconnect(void)
 {
-	m_nSessionID = id; 
+	if (gpMob) {
+		delete gpMob;
+		gpMob = NULL;
+	}
+
+#ifdef ROUTER
+	AllJoynRouterShutdown();
+#endif
+	AllJoynShutdown();
+}
+
+static int catmem(char ** data, void * fsi, int len)
+{
+	return 0;
+}
+
+int alljoyn_send(int nDocID, char * sText, int nLength)
+{
+	time_t aid = time(NULL);
+	int ret = gpMob->SendData(aid, ACT_DATA, nDocID, sText, nLength);
+
+	if (ER_OK == ret) {
+		int len = 0, l;
+		char * p = sText;
+		char * data = 0;
+		char * p2;
+		FILE_SEND_ITEM fsi;
+
+		// ' inside of file:// most be urlencoded.
+		while ((p = strstr(p, "file://")) != NULL) {
+			p += 7;
+			if ((p2 = strchr(p, '\'')) != NULL && (l = (p2 - p)) > 0) {
+				if (l < MAX_URI) {
+					memcpy(fsi.uri, p, l);
+					fsi.uri[l] = 0;
+					fsi.mtime = get_file_mtime(fsi.uri);
+					fsi.fsize = get_file_length(fsi.uri);
+
+					if (catmem(&data, &fsi, sizeof(FILE_SEND_ITEM)) == sizeof(FILE_SEND_ITEM)) len += sizeof(FILE_SEND_ITEM);
+				}
+
+				p = p2 + 1;
+			}
+			else p++;
+		}
+		if (len > 0) ret = gpMob->SendData(aid, ACT_FLIST, nDocID, data, len);
+	}
+
+	return ret;
+}
+
+int alljoyn_session_id()
+{
+	return gpMob->GetSessionID();
+}
+
+const char * alljoyn_join_name()
+{
+	return gpMob->GetJoinName();
 }
