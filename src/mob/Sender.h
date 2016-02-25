@@ -38,7 +38,7 @@ using namespace ajn;
 #define ACT_FLIST		1
 #define ACT_FLIST_REQ	2
 #define ACT_FILE		3
-#define ACT_OMITTED		4
+#define ACT_MISSING		4
 #define ACT_END			5
 
 #define SEND_BUF		(8192 - sizeof(int) * 2)
@@ -94,20 +94,14 @@ typedef struct {
 
 } FILE_SEND_ITEM;
 
-class WORKS {
-public:
-	WORKS(const char * u, int sn, const char * b, const char * d){
-		uid = u;
-		snum = sn;
-		base = b;
-		data = d;
-	}
-
+typedef struct {
 	std::string uid;
 	int snum;
 	std::string base;
 	const char * data;
-};
+} RECEIVE;
+
+typedef std::vector<RECEIVE> vReceives;
 
 class CAlljoynMob;
 
@@ -117,13 +111,12 @@ public:
 	CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* path);
 	~CSender();
 
-	QStatus _Send(int nChain, const char * pData, int nLength);
+	QStatus _Send(const char * sJoinName, int nChain, const char * pData, int nLength);
 
 	/** Send a mob signal */
-	QStatus SendData(int nAID, int nAction, int wid, const char * msg, int nLength);
+	QStatus SendData(const char * sJoinName, int nAID, int nAction, int wid, const char * msg, int nLength);
 
-	BOOL IsOmitted(int nDocID);
-	void FixOmitted(int nDocID);
+	void MissingCheck();
 	const std::string & Save(int nDocID, const char * sText, int nLength, std::string & out);
 	/** Receive a signal from another mob client */
 	void OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg);
@@ -132,10 +125,10 @@ public:
 
 private:
 	CAlljoynMob *						m_pMob;
-	std::vector<WORKS *>				m_vWorks;
 	std::map<int, TRAIN>				m_mTrain;
 	std::map<int, TRAIN>				m_mHangar;
 	const InterfaceDescription::Member* m_pMobSignalMember;
+	vReceives							m_vReceives;
 };
 
 #endif /* _SENDER_H_ */

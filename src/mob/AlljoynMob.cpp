@@ -170,7 +170,7 @@ static int catmem(char ** data, void * fsi, int len)
 int alljoyn_send(int nDocID, char * sText, int nLength)
 {
 	time_t aid = time(NULL);
-	int ret = gpMob->SendData(aid, ACT_DATA, nDocID, sText, nLength);
+	int ret = gpMob->SendData(NULL, aid, ACT_DATA, nDocID, sText, nLength);
 
 	if (ER_OK == ret) {
 		int len = 0, l;
@@ -196,7 +196,7 @@ int alljoyn_send(int nDocID, char * sText, int nLength)
 			}
 			else p++;
 		}
-		if (len > 0) ret = gpMob->SendData(aid, ACT_FLIST, nDocID, data, len);
+		if (len > 0) ret = gpMob->SendData(NULL, aid, ACT_FLIST, nDocID, data, len);
 	}
 
 	return ret;
