@@ -13,20 +13,7 @@
 extern "C" {
 #endif
 
-	void alljoyn_disconnect(void);
-	int alljoyn_connect(const char * advertisedName, const char * joinName);
-
-	int alljoyn_send(int nDocID, char * sText, int nLength);
-
-	int alljoyn_session_id();
-	const char * alljoyn_join_name();
-
-	int mob_init(int argc, char** argv);
-	int mob_open_db(const char *zFilename, sqlite3 **ppDb);
-	int mob_sync_db(sqlite3 * pDb, const char * uid, int snum);
-	int mob_apply(int wid, const char * uid, int snum, const char * sql);
-	int mob_close_db(sqlite3 * pDb);
-	void mob_exit(void);
+	/* string utility functions */
 
 	typedef struct Str Str;
 
@@ -39,6 +26,25 @@ extern "C" {
 	extern void strInit(Str *p);
 	extern void strFree(Str *p);
 	extern int strPrintf(Str *p, const char *zFormat, ...);
+
+	/* alljoyn related functions */
+
+	void alljoyn_disconnect(void);
+	int alljoyn_connect(const char * advertisedName, const char * joinName);
+
+	int alljoyn_send(int nDocID, char * sText, int nLength);
+
+	int alljoyn_session_id();
+	const char * alljoyn_join_name();
+
+	/* mob functions */
+
+	int mob_init(int argc, char** argv);
+	int mob_open_db(const char *zFilename, sqlite3 **ppDb);
+	int mob_sync_db(sqlite3 * pDb, const char * uid, int snum);
+	int mob_apply(int wid, const char * uid, int snum, const char * sql);
+	int mob_close_db(sqlite3 * pDb);
+	void mob_exit(void);
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */

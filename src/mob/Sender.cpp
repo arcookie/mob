@@ -201,23 +201,23 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 				break;
 			case ACT_END:
 			{
-							std::map<int, TRAIN>::iterator _iter;
+				std::map<int, TRAIN>::iterator _iter;
 
-							if ((_iter = m_mHangar.find(iter->second.aid)) != m_mHangar.end()){
-								std::string s;
+				if ((_iter = m_mHangar.find(iter->second.aid)) != m_mHangar.end()){
+					std::string s;
 
-								// file:// 를 테이블을 이용하여 변환하여 DB 에 반영
-								// apply 하고 머지후 전달할것.
+					// file:// 를 테이블을 이용하여 변환하여 DB 에 반영
+					// apply 하고 머지후 전달할것.
 
-								Save(_iter->second.wid, _iter->second.body, _iter->second.length, s);
+					Save(_iter->second.wid, _iter->second.body, _iter->second.length, s);
 
-								std::vector<WORKS *>::iterator __iter;
+					std::vector<WORKS *>::iterator __iter;
 
-								for (__iter = m_vWorks.begin(); __iter != m_vWorks.end(); __iter++) {
-									mob_apply(_iter->second.wid, (*__iter)->uid.data(), (*__iter)->snum, (*__iter)->data);
-								}
-								m_mHangar.erase(_iter);
-							}
+					for (__iter = m_vWorks.begin(); __iter != m_vWorks.end(); __iter++) {
+						mob_apply(_iter->second.wid, (*__iter)->uid.data(), (*__iter)->snum, (*__iter)->data);
+					}
+					m_mHangar.erase(_iter);
+				}
 			}
 				break;
 			}
