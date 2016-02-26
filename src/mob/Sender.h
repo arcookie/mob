@@ -96,11 +96,22 @@ typedef struct {
 
 typedef struct {
 	std::string uid;
-	int snum;
+	std::string uid_p;
+	int snum_s;
+	int snum_e;
+	int snum_p;
 	std::string base;
 	const char * data;
 } RECEIVE;
 
+typedef struct {
+	std::string uid;
+	int snum;
+	std::string base;
+	const char * data;
+} APPLY;
+
+typedef std::vector<APPLY> vApplies;
 typedef std::vector<RECEIVE> vReceives;
 
 class CAlljoynMob;
@@ -113,11 +124,11 @@ public:
 
 	QStatus _Send(const char * sJoinName, int nChain, const char * pData, int nLength);
 
-	/** Send a mob signal */
+	void Apply(int nDocID);
 	QStatus SendData(const char * sJoinName, int nAID, int nAction, int wid, const char * msg, int nLength);
 
 	void MissingCheck();
-	const std::string & Save(int nDocID, const char * sText, int nLength, std::string & out);
+	void Save(int nDocID, const char * sText, int nLength);
 	/** Receive a signal from another mob client */
 	void OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg);
 	virtual void GetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}

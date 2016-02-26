@@ -77,7 +77,7 @@ static int _close_db(long id, const char * mark, sqlite3 *pDb)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // global functions
 
-int mob_apply(int wid, const char * uid, int snum, const char * sql)
+void mob_apply_db(int wid, const char * uid, int snum, const char * sql)
 {
 	sqlite3_stmt *pStmt = NULL;
 	// 여기서 누락체크하여 누락이 있으면 잠시후 다시 체크하여 전송 (missing 태이블)
@@ -91,7 +91,6 @@ int mob_apply(int wid, const char * uid, int snum, const char * sql)
 		mob_sync_db(pDB, uid, snum);
 		break;
 	);
-	return 0;
 }
 
 int mob_init(int argc, char** argv)
@@ -179,6 +178,17 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 		return nRet;
 	}
 	return SQLITE_ERROR;
+}
+
+void mob_undo_db(int wid, const char * uid, int snum)
+{
+	sqlite3_stmt *pStmt = NULL;
+
+	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main FROM works WHERE num=%d", wid),
+		sqlite3 * pDB = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
+
+		break;
+	);
 }
 
 int mob_sync_db(sqlite3 * pDb, char * uid, int snum)

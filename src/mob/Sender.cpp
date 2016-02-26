@@ -31,6 +31,15 @@
 #include "Sender.h"
 #include "AlljoynMob.h"
 
+struct find_id : std::unary_function<RECEIVE, bool> {
+	int snum;
+	std::string uid;
+	find_id(std::string & u, int sn) :uid(u), snum(sn) { }
+	bool operator()(RECEIVE const& m) const {
+		return (m.uid == uid && m.snum_s <= snum && m.snum_e >= snum);
+	}
+};
+
 
 static int catmem(char ** data, void * fsi, int len)
 {
@@ -95,10 +104,11 @@ CSender::~CSender()
 	}
 }
 
-const std::string & CSender::Save(int nDocID, const char * sText, int nLength, std::string & out)
+void CSender::Save(int nDocID, const char * sText, int nLength)
 {
-	const char * s = strstr(sText, "/*|");
 	const char * e;
+	vReceives::iterator iter;
+	const char * s = strstr(sText, "/*|");
 
 	if (s) {
 		s += 3;
@@ -106,29 +116,58 @@ const std::string & CSender::Save(int nDocID, const char * sText, int nLength, s
 			std::vector<std::string> v;
 
 			if (asVector(s, e - s, "|", v) && v.size() == 3) {
-				RECEIVE rcv = { v[0].data(), atoi(v[1].data()), v[2].data(), sText };
+				RECEIVE rcv = { v[0].data(), v[0].data(), atoi(v[1].data()), atoi(v[1].data()), atoi(v[1].data()), v[2].data(), sText };
 
 				m_vReceives.push_back(rcv);
+
+				for (iter = m_vReceives.begin(); iter != m_vReceives.end(); iter++) {
+					if ((*iter).snum_s != (*iter).snum_e && (*iter).snum_e > 1 && std::find_if(m_vReceives.begin(), m_vReceives.end(), find_id((*iter).uid, (*iter).snum_e - 1)) == m_vReceives.end()) {
+						return;
+					}
+				}
 			}
-			// settimer -> MissingCheck();
 		}
 	}
 
-	// 충돌이 존재하면 롤백
-
-	// 보냄과 동시에 정리.
-
-	return out;
+	Apply(nDocID);
 }
 
-struct find_id : std::unary_function<RECEIVE, bool> {
-	int snum;
-	std::string uid;
-	find_id(std::string & u, int sn) :uid(u), snum(sn) { }
-	bool operator()(RECEIVE const& m) const {
-		return (m.uid == uid && m.snum == snum);
+void CSender::Apply(int nDocID)
+{
+	APPLY ap;
+	int snum_undo;
+	vApplies applies;
+	vReceives::iterator iter;
+	const char * uid_undo = NULL;
+
+	for (iter = m_vReceives.begin(); iter != m_vReceives.end();) {
+		if ((*iter).data) {
+			ap.uid = (*iter).uid;
+			ap.snum = (*iter).snum_e;
+			ap.data = (*iter).data;
+			applies.push_back(ap);
+			(*iter).data = NULL;
+
+			vReceives::iterator it = std::find_if(m_vReceives.begin(), m_vReceives.end(), find_id((*iter).uid, (*iter).snum_e - 1));
+
+			if (it != m_vReceives.end()) {
+				(*it).snum_e = (*iter).snum_e;
+				iter = m_vReceives.erase(iter);
+			}
+			else iter++;
+		}
+		else iter++;
 	}
-};
+
+	if (uid_undo) mob_undo_db(nDocID, uid_undo, snum_undo);
+
+	vApplies::iterator iter2;
+
+	for (iter2 = applies.begin(); iter2 != applies.end(); iter2++) {
+		mob_apply_db(nDocID, (*iter2).uid.data(), (*iter2).snum, (*iter2).data);
+		delete (*iter2).data;
+	}
+}
 
 void CSender::MissingCheck()
 {
@@ -137,8 +176,8 @@ void CSender::MissingCheck()
 		vReceives::iterator iter;
 
 		for (iter = m_vReceives.begin(); iter != m_vReceives.end(); iter++) {
-			if ((*iter).snum > 1 && std::find_if(m_vReceives.begin(), m_vReceives.end(), find_id((*iter).uid, (*iter).snum - 1)) == m_vReceives.end()) {
-				miss[(*iter).uid] += std::to_string((*iter).snum - 1) + "|";
+			if ((*iter).snum_s != (*iter).snum_e && (*iter).snum_e > 1 && std::find_if(m_vReceives.begin(), m_vReceives.end(), find_id((*iter).uid, (*iter).snum_e - 1)) == m_vReceives.end()) {
+				miss[(*iter).uid] += std::to_string((*iter).snum_e - 1) + "|";
 			}
 		}
 	}
@@ -225,18 +264,12 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 				std::map<int, TRAIN>::iterator _iter;
 
 				if ((_iter = m_mHangar.find(iter->second.aid)) != m_mHangar.end()){
-					std::string s;
 
 					// file:// 를 테이블을 이용하여 변환하여 DB 에 반영
-					// apply 하고 머지후 전달할것.
+					// 충돌이 존재하면 롤백
 
-					Save(_iter->second.wid, _iter->second.body, _iter->second.length, s);
+					Save(_iter->second.wid, _iter->second.body, _iter->second.length);
 
-					vReceives::iterator __iter;
-
-					for (__iter = m_vReceives.begin(); __iter != m_vReceives.end(); __iter++) {
-						mob_apply(_iter->second.wid, (*__iter).uid.data(), (*__iter).snum, (*__iter).data);
-					}
 					m_mHangar.erase(_iter);
 				}
 			}
