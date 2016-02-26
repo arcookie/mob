@@ -135,10 +135,8 @@ void CSender::Save(int nDocID, const char * sText, int nLength)
 void CSender::Apply(int nDocID)
 {
 	APPLY ap;
-	int snum_undo;
 	vApplies applies;
 	vReceives::iterator iter;
-	const char * uid_undo = NULL;
 
 	for (iter = m_vReceives.begin(); iter != m_vReceives.end();) {
 		if ((*iter).data) {
@@ -159,11 +157,14 @@ void CSender::Apply(int nDocID)
 		else iter++;
 	}
 
-	if (uid_undo) mob_undo_db(nDocID, uid_undo, snum_undo);
+	vApplies::iterator iter2 = applies.begin();
 
-	vApplies::iterator iter2;
+	if (iter2 != applies.end()) {
+		mob_undo_db(nDocID, (*iter2).uid.data(), (*iter2).snum, (*iter2).base.data());
+		iter2++;
+	}
 
-	for (iter2 = applies.begin(); iter2 != applies.end(); iter2++) {
+	for (; iter2 != applies.end(); iter2++) {
 		mob_apply_db(nDocID, (*iter2).uid.data(), (*iter2).snum, (*iter2).data);
 		delete (*iter2).data;
 	}
@@ -214,6 +215,8 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 			switch (iter->second.action) {
 			case ACT_MISSING:
 				// undo DB 에서 uid, snum 을 찾아 타킷 발송.
+				//SendData(NULL/*iter->second.uid*/, iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data, len); // special target most be assigned.
+
 				break;
 			case ACT_DATA:
 				printf("%s:(%d) %ssqlite>", msg->GetSender(), iter->second.length, iter->second.body);

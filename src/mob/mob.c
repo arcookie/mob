@@ -77,18 +77,19 @@ static int _close_db(long id, const char * mark, sqlite3 *pDb)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // global functions
 
-void mob_apply_db(int wid, const char * uid, int snum, const char * sql)
+void mob_apply_db(int wid, const char * uid, int snum, const char * base, const char * sql)
 {
 	sqlite3_stmt *pStmt = NULL;
 	// 여기서 누락체크하여 누락이 있으면 잠시후 다시 체크하여 전송 (missing 태이블)
 	// 없으면 삭제 가능한 위치로 전송 
 	// 누락이 없으면 순서대로 바로 소진(data 는 테이블에 남지 않는다.)
+	// sql 은 테이블 단위로 = 1 base
 
 	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main FROM works WHERE num=%d", wid),
 		sqlite3 * pDB = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
 
 		sqlite3_exec(pDB, sql, 0, 0, 0);
-		mob_sync_db(pDB, uid, snum);
+		mob_sync_db(pDB, uid, snum, base);
 		break;
 	);
 }
@@ -168,7 +169,7 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 			else return nRet;
 
 			if ((nRet = _create_db(id, "undo", &pUndoDb)) == SQLITE_OK) 
-				sqlite3_exec(pUndoDb, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid CHAR(16), snum INT DEFAULT 1, undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+				sqlite3_exec(pUndoDb, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid CHAR(16), snum INT DEFAULT 1, base VARCHAR(1024), undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 			else return nRet;
 
 			EXECUTE_SQL_V(*ppDb, ("PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;ATTACH '%ld_bak.db3' as aux;", id));
@@ -180,32 +181,41 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 	return SQLITE_ERROR;
 }
 
-void mob_undo_db(int wid, const char * uid, int snum)
+void mob_undo_db(int wid, const char * uid, int snum, const char * base)
 {
 	sqlite3_stmt *pStmt = NULL;
 
-	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main FROM works WHERE num=%d", wid),
+	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, ptr_undo FROM works WHERE num=%d", wid),
+		sqlite3_stmt *pStmt2 = NULL;
 		sqlite3 * pDB = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
+		sqlite3 * pDBUndo = (sqlite3 *)sqlite3_column_int64(pStmt, 1);
 
+		QUERY_SQL_V(pDBUndo, pStmt2, ("SELECT num FROM works WHERE uid=%Q AND snum=%d AND base=%Q", uid, snum, base),
+			sqlite3_stmt *pStmt3 = NULL;
+			int num = sqlite3_column_int(pStmt2, 0);
+
+			QUERY_SQL_V(pDBUndo, pStmt3, ("SELECT undo FROM works WHERE num > %d AND base=%Q ORDER BY num DESC", num, base),
+				sqlite3_exec(pDB, sqlite3_column_text(pStmt3, 0), 0, 0, 0);
+			);
+			EXECUTE_SQL_V(pDB, ("DELETE FROM works WHERE num > %d AND base=%Q", num, base)); // num 의 rotation 고려할것.
+			break;
+		);
 		break;
 	);
 }
 
-int mob_sync_db(sqlite3 * pDb, char * uid, int snum)
+int mob_sync_db(sqlite3 * pDb, char * uid, int snum, const char * table)
 {
 	Str base, undo, redo;
 	sqlite3_stmt *pStmt = NULL;
 
 	strInit(&undo);
 	strInit(&redo);
-	strInit(&base);
 
-	char * bak = sqlite3_mprintf("%ld_bak.db3", (long)pDb);
-
-	get_diff(pDb, bak, &base, &redo, &undo);
-
-	if (redo.z){
-		if (!uid) {
+	if (!uid) {
+		strInit(&base);
+		get_diff(pDb, &base, &redo, &undo);
+		if (redo.z){
 			QUERY_SQL_V(master_db, pStmt, ("SELECT num, uid, ptr_back, ptr_undo FROM works WHERE ptr_main = %ld;", (long)pDb),
 				sqlite3_stmt *pStmt2 = NULL;
 				sqlite3 * pUndoDb = (sqlite3 *)sqlite3_column_int64(pStmt, 3);
@@ -225,10 +235,14 @@ int mob_sync_db(sqlite3 * pDb, char * uid, int snum)
 				break;
 			);
 		}
-		else {
+		strFree(&base);
+	}
+	else {
+		get_single_diff(pDb, table, &redo, &undo);
+		if (redo.z){
 			QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_back, ptr_undo FROM works WHERE ptr_main = %ld;", (long)pDb),
 				sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 0), redo.z, 0, 0, 0);
-				EXECUTE_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 1), ("INSERT INTO works (uid, snum, base, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", uid, snum, base, undo.z, redo.z));
+				EXECUTE_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 1), ("INSERT INTO works (uid, snum, base, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", uid, snum, table, undo.z, redo.z));
 				break;
 			);
 		}
@@ -236,8 +250,6 @@ int mob_sync_db(sqlite3 * pDb, char * uid, int snum)
 
 	strFree(&redo);
 	strFree(&undo);
-	strFree(&base);
-	sqlite3_free(&bak);
 
 	return 0;
 }

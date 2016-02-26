@@ -670,7 +670,7 @@ end_diff_one_table:
 	return;
 }
 
-void get_diff(sqlite3 * pDB, const char * zBackDB, Str * base, Str * redo, Str * undo)
+void get_diff(sqlite3 * pDB, Str * base, Str * redo, Str * undo)
 {
 	const char * table;
 
@@ -691,3 +691,8 @@ void get_diff(sqlite3 * pDB, const char * zBackDB, Str * base, Str * redo, Str *
 	sqlite3_finalize(pStmt);
 }
 
+void get_single_diff(sqlite3 * pDB, const char * table, Str * redo, Str * undo)
+{
+	diff_one_table(pDB, "aux", "main", table, redo);
+	diff_one_table(pDB, "main", "aux", table, undo);
+}
