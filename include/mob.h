@@ -26,13 +26,15 @@ extern "C" {
 	extern void strInit(Str *p);
 	extern void strFree(Str *p);
 	extern int strPrintf(Str *p, const char *zFormat, ...);
+	sqlite3_stmt *db_prepare(sqlite3 * pDB, const char *zFormat, ...);
+	void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab, Str *out);
 
 	/* alljoyn related functions */
 
 	void alljoyn_disconnect(void);
 	int alljoyn_connect(const char * advertisedName, const char * joinName);
 
-	int alljoyn_send(int nDocID, char * sText, int nLength);
+	int alljoyn_send(unsigned int nDocID, char * sText, int nLength);
 
 	int alljoyn_session_id();
 	const char * alljoyn_join_name();
@@ -41,7 +43,7 @@ extern "C" {
 
 	int mob_init(int argc, char** argv);
 	int mob_open_db(const char *zFilename, sqlite3 **ppDb);
-	int mob_sync_db(sqlite3 * pDb, const char * uid, int snum, const char * table);
+	int mob_sync_db(sqlite3 * pDb);
 	void mob_apply_db(int wid, const char * uid, int snum, const char * sql);
 	void mob_undo_db(int wid, const char * uid, int snum, const char * base);
 	int mob_close_db(sqlite3 * pDb);

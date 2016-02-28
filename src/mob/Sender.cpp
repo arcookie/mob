@@ -310,7 +310,7 @@ QStatus CSender::_Send(const char * sJoinName, int nChain, const char * pData, i
 	return status;
 }
 
-QStatus CSender::SendData(const char * sJoinName, int nAID, int nAction, int wid, const char * msg, int nLength)
+QStatus CSender::SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength)
 {
 	TRAIN_HEADER th;
 	uint8_t flags = 0;
@@ -326,7 +326,7 @@ QStatus CSender::SendData(const char * sJoinName, int nAID, int nAction, int wid
 	QStatus status;
 	MsgArg mobArg("ay", sizeof(TRAIN_HEADER), &th);
 
-	if ((status = Signal(sJoinName, m_pMob->GetSessionID(), *m_pMobSignalMember, &mobArg, 1, 0, flags)) == ER_OK && nLength > 0) {
+	if ((status = Signal(sJoinName, wid, *m_pMobSignalMember, &mobArg, 1, 0, flags)) == ER_OK && nLength > 0) {
 		int l = nLength > SEND_BUF ? SEND_BUF : nLength;
 		const char * p = msg;
 

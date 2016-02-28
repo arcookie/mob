@@ -125,7 +125,7 @@ public:
 	QStatus _Send(const char * sJoinName, int nChain, const char * pData, int nLength);
 
 	void Apply(int nDocID);
-	QStatus SendData(const char * sJoinName, int nAID, int nAction, int wid, const char * msg, int nLength);
+	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength);
 
 	void MissingCheck();
 	void Save(int nDocID, const char * sText, int nLength);

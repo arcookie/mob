@@ -167,7 +167,7 @@ static int catmem(char ** data, void * fsi, int len)
 	return 0;
 }
 
-int alljoyn_send(int nDocID, char * sText, int nLength)
+int alljoyn_send(SessionId nDocID, char * sText, int nLength)
 {
 	time_t aid = time(NULL);
 	int ret = gpMob->SendData(NULL, aid, ACT_DATA, nDocID, sText, nLength);

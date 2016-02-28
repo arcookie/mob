@@ -146,7 +146,8 @@ static sqlite3_stmt *db_vprepare(sqlite3 * pDB, const char *zFormat, va_list ap)
 	}
 	return pStmt;
 }
-static sqlite3_stmt *db_prepare(sqlite3 * pDB, const char *zFormat, ...){
+
+sqlite3_stmt *db_prepare(sqlite3 * pDB, const char *zFormat, ...){
 	va_list ap;
 	sqlite3_stmt *pStmt;
 	va_start(ap, zFormat);
@@ -668,31 +669,4 @@ end_diff_one_table:
 	namelistFree(az);
 	namelistFree(az2);
 	return;
-}
-
-void get_diff(sqlite3 * pDB, Str * base, Str * redo, Str * undo)
-{
-	const char * table;
-
-	sqlite3_stmt *pStmt = db_prepare(pDB,
-		"SELECT name FROM main.sqlite_master\n"
-		" WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%'\n"
-		" UNION\n"
-		"SELECT name FROM aux.sqlite_master\n"
-		" WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%'\n"
-		" ORDER BY name"
-		);
-	while (SQLITE_ROW == sqlite3_step(pStmt)){
-		table = (const char*)sqlite3_column_text(pStmt, 0);
-		diff_one_table(pDB, "aux", "main", table, redo);
-		diff_one_table(pDB, "main", "aux", table, undo);
-		strPrintf(base, "|%s|", table);
-	}
-	sqlite3_finalize(pStmt);
-}
-
-void get_single_diff(sqlite3 * pDB, const char * table, Str * redo, Str * undo)
-{
-	diff_one_table(pDB, "aux", "main", table, redo);
-	diff_one_table(pDB, "main", "aux", table, undo);
 }

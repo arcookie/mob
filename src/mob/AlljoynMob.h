@@ -46,7 +46,7 @@ public:
 
 	virtual QStatus Init(const char * sJoinName);
 
-	QStatus SendData(const char * sJoinName, int nAID, int nAction, int wid, const char * msg, int nLength) { return m_pSender->SendData(sJoinName, nAID, nAction, wid, msg, nLength); }
+	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength) { return m_pSender->SendData(sJoinName, nAID, nAction, wid, msg, nLength); }
 
 	const char * GetJoinName() { return m_sJoiner.data(); }
 	void SetJoinName(const char * name) { m_sJoiner = name; }
