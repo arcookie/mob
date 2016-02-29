@@ -125,16 +125,6 @@ char * get_file_path(const char * path)
 	return 0;
 }
 
-int get_file_mtime(const char * path)
-{
-	return 0;
-}
-
-long long get_file_length(const char * path)
-{
-	return 0L;
-}
-
 /** Take input from stdin and send it as a mob message, continue until an error or
 * SIGINT occurs, return the result status. */
 int alljoyn_connect(const char * advertisedName, const char * joinName)
@@ -165,41 +155,6 @@ void alljoyn_disconnect(void)
 static int catmem(char ** data, void * fsi, int len)
 {
 	return 0;
-}
-
-int alljoyn_send(SessionId nDocID, char * sText, int nLength)
-{
-	time_t aid = time(NULL);
-	int ret = gpMob->SendData(NULL, aid, ACT_DATA, nDocID, sText, nLength);
-
-	if (ER_OK == ret) {
-		int len = 0, l;
-		char * p = sText;
-		char * data = 0;
-		char * p2;
-		FILE_SEND_ITEM fsi;
-
-		// ' inside of file:// most be urlencoded.
-		while ((p = strstr(p, "file://")) != NULL) {
-			p += 7;
-			if ((p2 = strchr(p, '\'')) != NULL && (l = (p2 - p)) > 0) {
-				if (l < MAX_URI) {
-					memcpy(fsi.uri, p, l);
-					fsi.uri[l] = 0;
-					fsi.mtime = get_file_mtime(fsi.uri);
-					fsi.fsize = get_file_length(fsi.uri);
-
-					if (catmem(&data, &fsi, sizeof(FILE_SEND_ITEM)) == sizeof(FILE_SEND_ITEM)) len += sizeof(FILE_SEND_ITEM);
-				}
-
-				p = p2 + 1;
-			}
-			else p++;
-		}
-		if (len > 0) ret = gpMob->SendData(NULL, aid, ACT_FLIST, nDocID, data, len);
-	}
-
-	return ret;
 }
 
 int alljoyn_session_id()

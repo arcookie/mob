@@ -46,7 +46,7 @@ public:
 
 	virtual QStatus Init(const char * sJoinName);
 
-	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength) { return m_pSender->SendData(sJoinName, nAID, nAction, wid, msg, nLength); }
+	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0) { return m_pSender->SendData(sJoinName, nAID, nAction, wid, msg, nLength, pExtra, nExtLen); }
 
 	const char * GetJoinName() { return m_sJoiner.data(); }
 	void SetJoinName(const char * name) { m_sJoiner = name; }
@@ -67,5 +67,7 @@ protected:
 	SessionId				m_nSessionID;
 	MobBusListener			m_BusListener;
 };
+
+extern CAlljoynMob * gpMob;
 
 #endif /* _ALLJOYN_MOB_H_ */

@@ -52,6 +52,8 @@ using namespace ajn;
 #define TRAIN_MARK_6	0x32533414
 #define TRAIN_MARK_END	6
 
+#define TRAIN_EXTRA_LEN	128
+
 #define TRAIN_HEADER(a)	int __o__[TRAIN_MARK_END] = {TRAIN_MARK_1,TRAIN_MARK_2,TRAIN_MARK_3,TRAIN_MARK_4,TRAIN_MARK_5,TRAIN_MARK_6,}; memcpy((char *)(a), (char *)__o__, sizeof(__o__));
 
 #define IS_TRAIN_HEADER(a)	\
@@ -68,6 +70,7 @@ typedef struct {
 	int wid;  // doc id
 	int action; // 0 data, 1 file list 2 file list req 3 file
 	int chain;
+	char extra[TRAIN_EXTRA_LEN];
 } TRAIN_HEADER;
 
 class TRAIN {
@@ -84,6 +87,7 @@ public:
 	int wid;  // doc id
 	int action; // 0 data, 1 file list 2 file list req 3 file
 	int length;
+	char extra[TRAIN_EXTRA_LEN];
 	char * body;
 };
 
@@ -95,19 +99,21 @@ typedef struct {
 } FILE_SEND_ITEM;
 
 typedef struct {
-	std::string uid;
-	std::string uid_p;
-	int snum_s;
-	int snum_e;
+	qcc::String uid;
+	qcc::String uid_p;
+	int snum;
 	int snum_p;
-	std::string base;
+	int sn_s;
+	int sn_e;
+	qcc::String base;
 	const char * data;
 } RECEIVE;
 
 typedef struct {
-	std::string uid;
+	qcc::String uid;
+	int sn;
 	int snum;
-	std::string base;
+	qcc::String base;
 	const char * data;
 } APPLY;
 
@@ -122,15 +128,15 @@ public:
 	CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* path);
 	~CSender();
 
-	QStatus _Send(const char * sJoinName, int nChain, const char * pData, int nLength);
+	QStatus _Send(SessionId nSID, const char * sJoinName, int nChain, const char * pData, int nLength);
 
-	void Apply(int nDocID);
-	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength);
+	void Apply(SessionId nSID);
+	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
 	void MissingCheck();
-	void Save(int nDocID, const char * sText, int nLength);
-	/** Receive a signal from another mob client */
+	void Save(SessionId nSID, const char * sText, int nLength, const char * pExtra, int nExtLen);
 	void OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg);
+
 	virtual void GetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}
 	virtual void SetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}
 

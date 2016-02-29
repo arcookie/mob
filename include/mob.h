@@ -23,6 +23,15 @@ extern "C" {
 		int nUsed;      /* Bytes actually used in z[] */
 	};
 
+	typedef struct {
+		int sn;
+		int snum;
+		int snum_p;
+		char uid[16];
+		char uid_p[16];
+		char base[64];
+	} SYNC_DATA;
+
 	extern void strInit(Str *p);
 	extern void strFree(Str *p);
 	extern int strPrintf(Str *p, const char *zFormat, ...);
@@ -34,7 +43,7 @@ extern "C" {
 	void alljoyn_disconnect(void);
 	int alljoyn_connect(const char * advertisedName, const char * joinName);
 
-	int alljoyn_send(unsigned int nDocID, char * sText, int nLength);
+	int alljoyn_send(unsigned int nDocID, char * sText, int nLength, const char * pExtra, int nExtLen);
 
 	int alljoyn_session_id();
 	const char * alljoyn_join_name();
@@ -44,8 +53,8 @@ extern "C" {
 	int mob_init(int argc, char** argv);
 	int mob_open_db(const char *zFilename, sqlite3 **ppDb);
 	int mob_sync_db(sqlite3 * pDb);
-	void mob_apply_db(int wid, const char * uid, int snum, const char * sql);
-	void mob_undo_db(int wid, const char * uid, int snum, const char * base);
+	void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const char * sql);
+	void mob_undo_db(unsigned int sid, const char * uid, int snum, const char * base);
 	int mob_close_db(sqlite3 * pDb);
 	void mob_exit(void);
 

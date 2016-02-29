@@ -77,31 +77,26 @@ static int _close_db(long id, const char * mark, sqlite3 *pDb)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // global functions
 
-void mob_apply_db(int wid, const char * uid, int snum, const char * base, const char * sql)
+void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const char * base, const char * sql)
 {
+	Str undo;
 	sqlite3_stmt *pStmt = NULL;
-	// 여기서 누락체크하여 누락이 있으면 잠시후 다시 체크하여 전송 (missing 태이블)
-	// 없으면 삭제 가능한 위치로 전송 
-	// 누락이 없으면 순서대로 바로 소진(data 는 테이블에 남지 않는다.)
-	// sql 은 테이블 단위로 = 1 base
 
-	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, ptr_back, ptr_undo FROM works WHERE num=%d", wid),
-		Str undo;
+	strInit(&undo);
+
+	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, ptr_back, ptr_undo FROM works WHERE num=%d", sid),
 		sqlite3 * pDB = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
-
-		strInit(&undo);
+		sqlite3 * pBackDB = (sqlite3 *)sqlite3_column_int64(pStmt, 1);
+		sqlite3 * pUndoDB = (sqlite3 *)sqlite3_column_int64(pStmt, 2);
 
 		sqlite3_exec(pDB, sql, 0, 0, 0);
-
 		diff_one_table(pDB, "main", "aux", base, &undo);
-
-		sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 1), sql, 0, 0, 0);
-		EXECUTE_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 2), ("INSERT INTO works (uid, snum, base, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", uid, snum, base, undo.z, sql));
-
-		strFree(&undo);
-
+		sqlite3_exec(pBackDB, sql, 0, 0, 0);
+		EXECUTE_SQL_V(pUndoDB, ("INSERT INTO works (uid, sn, snum, base, undo, redo) VALUES (%Q, %d, %d, %Q, %Q, %Q);", uid, sn, snum, base, undo.z, sql));
 		break;
 	);
+
+	strFree(&undo);
 }
 
 int mob_init(int argc, char** argv)
@@ -179,7 +174,7 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 			else return nRet;
 
 			if ((nRet = _create_db(id, "undo", &pUndoDb)) == SQLITE_OK) 
-				sqlite3_exec(pUndoDb, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid CHAR(16), snum INT DEFAULT 1, base VARCHAR(64), undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+				sqlite3_exec(pUndoDb, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid CHAR(16), sn INT DEFAULT 1, snum INT DEFAULT 1, base VARCHAR(64), undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 			else return nRet;
 
 			EXECUTE_SQL_V(*ppDb, ("PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;ATTACH '%ld_bak.db3' as aux;", id));
@@ -191,23 +186,23 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 	return SQLITE_ERROR;
 }
 
-void mob_undo_db(int wid, const char * uid, int snum, const char * base)
+void mob_undo_db(unsigned int sid, const char * uid, int snum, const char * base)
 {
 	sqlite3_stmt *pStmt = NULL;
+	sqlite3_stmt *pStmt2 = NULL;
+	sqlite3_stmt *pStmt3 = NULL;
 
-	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, ptr_undo FROM works WHERE num=%d", wid),
-		sqlite3_stmt *pStmt2 = NULL;
+	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, ptr_undo FROM works WHERE num=%d", sid),
 		sqlite3 * pDB = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
 		sqlite3 * pDBUndo = (sqlite3 *)sqlite3_column_int64(pStmt, 1);
 
 		QUERY_SQL_V(pDBUndo, pStmt2, ("SELECT num FROM works WHERE uid=%Q AND snum=%d AND base=%Q", uid, snum, base),
-			sqlite3_stmt *pStmt3 = NULL;
 			int num = sqlite3_column_int(pStmt2, 0);
 
 			QUERY_SQL_V(pDBUndo, pStmt3, ("SELECT undo FROM works WHERE num > %d AND base=%Q ORDER BY num DESC", num, base),
 				sqlite3_exec(pDB, sqlite3_column_text(pStmt3, 0), 0, 0, 0);
 			);
-			EXECUTE_SQL_V(pDB, ("DELETE FROM works WHERE num > %d AND base=%Q", num, base)); // num 의 rotation 고려할것.
+			EXECUTE_SQL_V(pDB, ("DELETE FROM works WHERE num > %d AND base=%Q;REINDEX works;", num, base));
 			break;
 		);
 		break;
@@ -216,7 +211,7 @@ void mob_undo_db(int wid, const char * uid, int snum, const char * base)
 
 int mob_sync_db(sqlite3 * pDb)
 {
-	int snum;
+	SYNC_DATA sd;
 	Str undo, redo;
 	sqlite3_stmt *pStmt = NULL;
 
@@ -224,33 +219,39 @@ int mob_sync_db(sqlite3 * pDb)
 	strInit(&redo);
 
 	QUERY_SQL_V(master_db, pStmt, ("SELECT num, uid, ptr_back, ptr_undo FROM works WHERE ptr_main = %ld;", (long)pDb),
-		const char * tbl;
 		int wid = sqlite3_column_int(pStmt, 0);
-		const char * uid = sqlite3_column_text(pStmt, 1);
+		sqlite3 * pBackDb = (sqlite3 *)sqlite3_column_int64(pStmt, 2);
 		sqlite3 * pUndoDb = (sqlite3 *)sqlite3_column_int64(pStmt, 3);
 		sqlite3_stmt *pStmt2 = db_prepare(pDb, "SELECT name FROM main.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' UNION\n"
 			"SELECT name FROM aux.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' ORDER BY name");
 
-		while (SQLITE_ROW == sqlite3_step(pStmt2)){
-			tbl = (const char*)sqlite3_column_text(pStmt2, 0);
+		strcpy(sd.uid, sqlite3_column_text(pStmt, 1));
+		strcpy(sd.uid_p, sd.uid);
 
-			diff_one_table(pDb, "main", "aux", tbl, &undo);
+		while (SQLITE_ROW == sqlite3_step(pStmt2)){
+			strcpy(sd.base, (const char*)sqlite3_column_text(pStmt2, 0));
+			diff_one_table(pDb, "main", "aux", sd.base, &undo);
 
 			if (undo.z){
-
-				strPrintf(&redo, "%16s%16d%64s", uid, snum, tbl);
-
-				diff_one_table(pDb, "aux", "main", tbl, &redo);
-
-				sqlite3_exec((sqlite3 *)sqlite3_column_int64(pStmt, 2), redo.z, 0, 0, 0);
-
-				QUERY_SQL_V(pUndoDb, pStmt2, ("SELECT (MAX(snum) + 1) AS sn FROM works WHERE uid = %Q AND base = %Q;", uid, tbl),
-					snum = sqlite3_column_int(pStmt2, 0);
+				sd.snum_p = -1;
+				QUERY_SQL_V(pUndoDb, pStmt2, ("SELECT uid, snum FROM works WHERE base = %Q ORDER BY num DESC LIMIT 1;", sd.base),
+					strcpy(sd.uid_p, sqlite3_column_text(pStmt2, 0));
+					sd.snum_p = sqlite3_column_int(pStmt2, 1);
 					break;
 				);
-				EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (uid, snum, base, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", uid, snum, tbl, undo.z, redo.z));
 
-				alljoyn_send(wid, redo.z, redo.nUsed);
+				sd.sn = 1;
+				QUERY_SQL_V(pUndoDb, pStmt2, ("SELECT (MAX(sn) + 1) AS sn FROM works WHERE uid = %Q;", sd.uid), sd.sn = sqlite3_column_int(pStmt2, 0); break;);
+
+				sd.snum = 1;
+				QUERY_SQL_V(pUndoDb, pStmt2, ("SELECT (MAX(snum) + 1) AS sn FROM works WHERE uid = %Q AND base = %Q;", sd.uid, sd.base), sd.snum = sqlite3_column_int(pStmt2, 0); break;);
+
+				diff_one_table(pDb, "aux", "main", sd.base, &redo);
+				sqlite3_exec(pBackDb, redo.z, 0, 0, 0);
+
+				EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (uid, sn, snum, base, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", sd.uid, sd.sn, sd.snum, sd.base, undo.z, redo.z));
+
+				alljoyn_send(wid, redo.z, redo.nUsed, (const char *)&sd, sizeof(SYNC_DATA));
 
 				strFree(&redo);
 				strFree(&undo);
