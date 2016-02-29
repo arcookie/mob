@@ -34,13 +34,6 @@
 
 using namespace ajn;
 
-#define ACT_DATA		0
-#define ACT_FLIST		1
-#define ACT_FLIST_REQ	2
-#define ACT_FILE		3
-#define ACT_MISSING		4
-#define ACT_END			5
-
 #define SEND_BUF		(8192 - sizeof(int) * 2)
 #define MAX_URI	1024
 
@@ -105,7 +98,6 @@ typedef struct {
 	int snum_p;
 	int sn_s;
 	int sn_e;
-	qcc::String base;
 	const char * data;
 } RECEIVE;
 
@@ -117,8 +109,27 @@ typedef struct {
 	const char * data;
 } APPLY;
 
-typedef std::vector<APPLY> vApplies;
-typedef std::vector<RECEIVE> vReceives;
+struct CompareAPPLY
+{
+	bool operator()(APPLY const& _Left, APPLY const& _Right) const
+	{
+		return _Left.uid.compare(_Right.uid) < 0;
+	}
+};
+
+typedef struct CompareAPPLY				compApply;
+typedef std::set<APPLY, compApply>		sApplies;
+
+typedef struct {
+	int snum_p;
+	qcc::String uid_p;
+	sApplies applies;
+} APPLIES;
+
+typedef std::vector<APPLIES>				vApplies;
+typedef std::map<qcc::String, vApplies>		mApplies;
+typedef std::vector<RECEIVE>				vReceives;
+typedef std::map<qcc::String, vReceives>	mReceives;
 
 class CAlljoynMob;
 
@@ -131,6 +142,7 @@ public:
 	QStatus _Send(SessionId nSID, const char * sJoinName, int nChain, const char * pData, int nLength);
 
 	void Apply(SessionId nSID);
+	BOOL PushApply(vApplies & applies, const char * base, const char * uid_p, int snum_p, BOOL bFirst);
 	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
 	void MissingCheck();
@@ -145,7 +157,7 @@ private:
 	std::map<int, TRAIN>				m_mTrain;
 	std::map<int, TRAIN>				m_mHangar;
 	const InterfaceDescription::Member* m_pMobSignalMember;
-	vReceives							m_vReceives;
+	mReceives							m_mReceives;
 };
 
 #endif /* _SENDER_H_ */

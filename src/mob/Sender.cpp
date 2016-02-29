@@ -41,6 +41,15 @@ struct find_id : std::unary_function<RECEIVE, bool> {
 	}
 };
 
+struct find_id_applies : std::unary_function<RECEIVE, bool> {
+	int snum_p;
+	qcc::String uid_p;
+	find_id_applies(const char * u, int sn) :uid_p(u), snum_p(sn) { }
+	bool operator()(APPLIES const& m) const {
+		return (m.uid_p == uid_p && m.snum_p == snum_p);
+	}
+};
+
 
 static int catmem(char ** data, void * fsi, int len)
 {
@@ -73,17 +82,21 @@ CSender::CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* path) : m_p
 
 CSender::~CSender()
 {
-	vReceives::iterator iter;
+	mReceives::iterator miter;
+	vReceives::iterator viter;
 
-	for (iter = m_vReceives.begin(); iter != m_vReceives.end(); iter++) {
-		delete (*iter).data;
+	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
+		for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
+			delete (*viter).data;
+		}
 	}
 }
 
 void CSender::Save(SessionId nSID, const char * sText, int nLength, const char * pExtra, int nExtLen)
 {
 	RECEIVE rcv;
-	vReceives::iterator iter;
+	mReceives::iterator miter;
+	vReceives::iterator viter;
 	SYNC_DATA * pSD = (SYNC_DATA *)pExtra;
 
 	rcv.uid_p = pSD->uid_p;
@@ -92,56 +105,92 @@ void CSender::Save(SessionId nSID, const char * sText, int nLength, const char *
 	rcv.snum = pSD->snum;
 	rcv.sn_s = pSD->sn;
 	rcv.sn_e = pSD->sn;
-	rcv.base = pSD->base;
 	rcv.data = sText;
 
-	m_vReceives.push_back(rcv);
+	m_mReceives[pSD->base].push_back(rcv);
 
-	for (iter = m_vReceives.begin(); iter != m_vReceives.end(); iter++) {
-		if ((*iter).sn_s != (*iter).sn_e && (*iter).sn_e > 1 && std::find_if(m_vReceives.begin(), m_vReceives.end(), find_id((*iter).uid, (*iter).sn_e - 1)) == m_vReceives.end()) {
-			return;
+	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
+		for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
+			if ((*viter).sn_s != (*viter).sn_e && (*viter).sn_e > 1 && std::find_if(miter->second.begin(), miter->second.end(), find_id((*viter).uid, (*viter).sn_e - 1)) == miter->second.end()) return;
 		}
 	}
 
 	Apply(nSID);
 }
 
+BOOL CSender::PushApply(vApplies & applies, const char * base, const char * uid_p, int snum_p, BOOL bFirst)
+{
+	APPLY apply;
+	vApplies::iterator viter;
+
+	if ((viter = std::find_if(applies.begin(), applies.end(), find_id_applies(uid_p, snum_p))) != applies.end()) (*viter).applies.insert(apply);
+	else if (bFirst) {
+		APPLIES appl;
+
+		appl.applies.insert(apply);
+		applies.push_back(appl);
+		bFirst = FALSE;
+	}
+	return TRUE;
+}
+
 void CSender::Apply(SessionId nSID)
 {
-	APPLY ap;
-	vApplies applies;
-	vReceives::iterator iter;
+	BOOL bFirst;
+	int num, n;
+	BOOL bWorked;
+	APPLY apply;
+	SYNC_DATA sd;
+	sApplies::iterator siter;
+	mApplies::iterator miter;
+	vApplies::iterator viter;
+	mReceives::iterator mRcvIt;
+	vReceives::iterator vRcvIt;
 
-	for (iter = m_vReceives.begin(); iter != m_vReceives.end();) {
-		if ((*iter).data) {
-			ap.uid = (*iter).uid;
-			ap.sn = (*iter).sn_e;
-			ap.snum = (*iter).snum;
-			ap.data = (*iter).data;
-			applies.push_back(ap);
-			(*iter).data = NULL;
+	for (mRcvIt = m_mReceives.begin(); mRcvIt != m_mReceives.end(); mRcvIt++) {
+		vApplies applies;
 
-			vReceives::iterator it = std::find_if(m_vReceives.begin(), m_vReceives.end(), find_id((*iter).uid, (*iter).sn_e - 1));
-
-			if (it != m_vReceives.end()) {
-				(*it).sn_e = (*iter).sn_e;
-				iter = m_vReceives.erase(iter);
-			}
-			else iter++;
+		for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
+			if ((*vRcvIt).data && (n = mob_find_parent_db(nSID, (*vRcvIt).uid_p.data(), (*vRcvIt).snum_p, mRcvIt->first.data())) > num) num = n;
 		}
-		else iter++;
-	}
 
-	vApplies::iterator iter2 = applies.begin();
+		while ((num = mob_get_db(nSID, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, mRcvIt->first.data(), sd.uid_p, sd.snum_p, TRUE);
 
-	if (iter2 != applies.end()) {
-		mob_undo_db(nSID, (*iter2).uid.data(), (*iter2).snum, (*iter2).base.data());
-		iter2++;
-	}
+		bFirst = TRUE;
 
-	for (; iter2 != applies.end(); iter2++) {
-		mob_apply_db(nSID, (*iter2).uid.data(), (*iter2).sn, (*iter2).snum, (*iter2).data);
-		delete (*iter2).data;
+		do {
+			bWorked = FALSE;
+			for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
+				if ((*vRcvIt).data && PushApply(applies, mRcvIt->first.data(), (*vRcvIt).uid_p.data(), (*vRcvIt).snum_p, bFirst)) {
+					bFirst = FALSE;
+					(*vRcvIt).data = NULL;
+
+					vReceives::iterator it = std::find_if(mRcvIt->second.begin(), mRcvIt->second.end(), find_id((*vRcvIt).uid, (*vRcvIt).sn_e - 1));
+
+					if (it != mRcvIt->second.end()) {
+						(*it).sn_e = (*vRcvIt).sn_e;
+						vRcvIt = mRcvIt->second.erase(vRcvIt);
+					}
+					else vRcvIt++;
+
+					bWorked = TRUE;
+				}
+				else vRcvIt++;
+			}
+		} while (bWorked);
+
+		vApplies::iterator viter = applies.begin();
+
+		if (viter != applies.end()) {
+			mob_undo_db(nSID, (*viter).uid_p.data(), (*viter).snum_p, mRcvIt->first.data());
+
+			for (; viter != applies.end(); viter++) {
+				for (siter = (*viter).applies.begin(); siter != (*viter).applies.end(); siter++) {
+					mob_apply_db(nSID, (*siter).uid.data(), (*siter).sn, (*siter).snum, mRcvIt->first.data(), (*siter).data);
+					delete (*siter).data;
+				}
+			}
+		}
 	}
 }
 
@@ -149,11 +198,14 @@ void CSender::MissingCheck()
 {
 	std::map<qcc::String, qcc::String> miss;
 	{
-		vReceives::iterator iter;
+		mReceives::iterator miter;
+		vReceives::iterator viter;
 
-		for (iter = m_vReceives.begin(); iter != m_vReceives.end(); iter++) {
-			if ((*iter).sn_s != (*iter).sn_e && (*iter).sn_e > 1 && std::find_if(m_vReceives.begin(), m_vReceives.end(), find_id((*iter).uid, (*iter).sn_e - 1)) == m_vReceives.end()) {
-				miss[(*iter).uid] += qcc::I32ToString((*iter).sn_e - 1) + "|";
+		for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
+			for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
+				if ((*viter).sn_s != (*viter).sn_e && (*viter).sn_e > 1 && std::find_if(miter->second.begin(), miter->second.end(), find_id((*viter).uid, (*viter).sn_e - 1)) == miter->second.end()) {
+					miss[(*viter).uid] += qcc::I32ToString((*viter).sn_e - 1) + "|";
+				}
 			}
 		}
 	}
@@ -332,12 +384,12 @@ long long get_file_length(const char * path)
 	return 0L;
 }
 
-int alljoyn_send(SessionId nDocID, char * sText, int nLength, const char * pExtra, int nExtLen)
+int alljoyn_send(SessionId nSID, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen)
 {
 	time_t aid = time(NULL);
-	int ret = gpMob->SendData(NULL, aid, ACT_DATA, nDocID, sText, nLength, pExtra, nExtLen);
+	int ret = gpMob->SendData(NULL, aid, nAction, nSID, sText, nLength, pExtra, nExtLen);
 
-	if (ER_OK == ret) {
+	if (sText && ER_OK == ret) {
 		int len = 0, l;
 		char * p = sText;
 		char * data = 0;
@@ -361,7 +413,7 @@ int alljoyn_send(SessionId nDocID, char * sText, int nLength, const char * pExtr
 			}
 			else p++;
 		}
-		if (len > 0) ret = gpMob->SendData(NULL, aid, ACT_FLIST, nDocID, data, len);
+		if (len > 0) ret = gpMob->SendData(NULL, aid, ACT_FLIST, nSID, data, len);
 	}
 
 	return ret;

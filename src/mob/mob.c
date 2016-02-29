@@ -251,7 +251,7 @@ int mob_sync_db(sqlite3 * pDb)
 
 				EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (uid, sn, snum, base, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", sd.uid, sd.sn, sd.snum, sd.base, undo.z, redo.z));
 
-				alljoyn_send(wid, redo.z, redo.nUsed, (const char *)&sd, sizeof(SYNC_DATA));
+				alljoyn_send(wid, ACT_DATA, redo.z, redo.nUsed, (const char *)&sd, sizeof(SYNC_DATA));
 
 				strFree(&redo);
 				strFree(&undo);
@@ -266,6 +266,22 @@ int mob_sync_db(sqlite3 * pDb)
 	strFree(&undo);
 
 	return 0;
+}
+
+void mob_signal_db(unsigned int sid)
+{
+	SYNC_SIGNAL ss;
+	sqlite3_stmt *pStmt = NULL;
+	sqlite3_stmt *pStmt2 = NULL;
+
+	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, uid FROM works WHERE num=%d", sid),
+		strcpy(ss.uid, sqlite3_column_text(pStmt, 1));
+		QUERY_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 0), pStmt2, ("SELECT MAX(sn) AS n FROM works WHERE uid = %Q;", ss.uid),
+			alljoyn_send(sid, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+			break;
+		);
+		break;
+	);
 }
 
 int mob_close_db(sqlite3 * pDb)
@@ -296,4 +312,14 @@ int mob_close_db(sqlite3 * pDb)
 	}
 
 	return sqlite3_close(pDb);
+}
+
+int mob_find_parent_db(unsigned int sid, const char * uid, int snum, const char * base)
+{
+	return 0;
+}
+
+int mob_get_db(unsigned int sid, int num, const char * base, SYNC_DATA * pSD)
+{
+	return 0;
 }

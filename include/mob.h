@@ -4,6 +4,14 @@
 
 #include "sqlite3.h"
 
+#define ACT_DATA		0
+#define ACT_FLIST		1
+#define ACT_FLIST_REQ	2
+#define ACT_FILE		3
+#define ACT_MISSING		4
+#define ACT_SIGNAL		5
+#define ACT_END			6
+
 #define NAME_PREFIX	"org.alljoyn.bus.arcookie.mob."
 
 /*
@@ -32,6 +40,11 @@ extern "C" {
 		char base[64];
 	} SYNC_DATA;
 
+	typedef struct {
+		int sn;
+		char uid[16];
+	} SYNC_SIGNAL;
+
 	extern void strInit(Str *p);
 	extern void strFree(Str *p);
 	extern int strPrintf(Str *p, const char *zFormat, ...);
@@ -43,7 +56,7 @@ extern "C" {
 	void alljoyn_disconnect(void);
 	int alljoyn_connect(const char * advertisedName, const char * joinName);
 
-	int alljoyn_send(unsigned int nDocID, char * sText, int nLength, const char * pExtra, int nExtLen);
+	int alljoyn_send(unsigned int nSID, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen);
 
 	int alljoyn_session_id();
 	const char * alljoyn_join_name();
@@ -53,10 +66,13 @@ extern "C" {
 	int mob_init(int argc, char** argv);
 	int mob_open_db(const char *zFilename, sqlite3 **ppDb);
 	int mob_sync_db(sqlite3 * pDb);
-	void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const char * sql);
+	void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const char * base, const char * sql);
 	void mob_undo_db(unsigned int sid, const char * uid, int snum, const char * base);
 	int mob_close_db(sqlite3 * pDb);
 	void mob_exit(void);
+	extern int mob_find_parent_db(unsigned int sid, const char * uid, int snum, const char * base);
+	extern int mob_get_db(unsigned int sid, int num, const char * base, SYNC_DATA * pSD);
+
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */
