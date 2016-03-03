@@ -85,9 +85,9 @@ static char *safeId(const char *zId){
 }
 
 /*
-** Initialize a Str object
+** Initialize a Block object
 */
-void strInit(Str *p)
+void strInit(Block *p)
 {
 	p->z = 0;
 	p->nAlloc = 0;
@@ -95,18 +95,18 @@ void strInit(Str *p)
 }
 
 /*
-** Free all memory held by a Str object
+** Free all memory held by a Block object
 */
-void strFree(Str *p)
+void strFree(Block *p)
 {
 	sqlite3_free(p->z);
 	strInit(p);
 }
 
 /*
-** Add formatted text to the end of a Str object
+** Add formatted text to the end of a Block object
 */
-int strPrintf(Str *p, const char *zFormat, ...)
+int strPrintf(Block *p, const char *zFormat, ...)
 {
 	int nNew;
 	for (;;){
@@ -116,6 +116,31 @@ int strPrintf(Str *p, const char *zFormat, ...)
 			sqlite3_vsnprintf(p->nAlloc - p->nUsed, p->z + p->nUsed, zFormat, ap);
 			va_end(ap);
 			nNew = (int)strlen(p->z + p->nUsed);
+		}
+		else{
+			nNew = p->nAlloc;
+		}
+		if (p->nUsed + nNew < p->nAlloc - 1){
+			p->nUsed += nNew;
+			break;
+		}
+		p->nAlloc = p->nAlloc * 2 + 1000;
+		p->z = sqlite3_realloc(p->z, p->nAlloc);
+		if (!p->z) break;
+	}
+	return !!p->z;
+}
+
+/*
+** Add memory to the end of a Block object
+*/
+int strCat(Block *p, const char * z, int n)
+{
+	int nNew;
+	for (;;){
+		if (p->z){
+			if (p->nUsed + n < p->nAlloc - 1) memcpy(p->z + p->nUsed, z, n);
+			else nNew = n;
 		}
 		else{
 			nNew = p->nAlloc;
@@ -313,7 +338,7 @@ pStmt = db_prepare(pDB, "PRAGMA %s.index_list=%Q", zDb, zTab);
 /*
 ** Print the sqlite3_value X as an SQL literal.
 */
-static void printQuoted(Str *out, sqlite3_value *X){
+static void printQuoted(Block *out, sqlite3_value *X){
 	switch (sqlite3_value_type(X)){
 	case SQLITE_FLOAT: {
 		double r1;
@@ -372,7 +397,7 @@ static void printQuoted(Str *out, sqlite3_value *X){
 /*
 ** Output SQL that will recreate the aux.zTab table.
 */
-static void dump_table(sqlite3 * pDB, const char *zAux, const char *zTab, Str *out){
+static void dump_table(sqlite3 * pDB, const char *zAux, const char *zTab, Block *out){
 	char *zId = safeId(zTab); /* Name of the table */
 	char **az = 0;            /* List of columns */
 	int nPk;                  /* Number of true primary key columns */
@@ -380,7 +405,7 @@ static void dump_table(sqlite3 * pDB, const char *zAux, const char *zTab, Str *o
 	int i;                    /* Loop counter */
 	sqlite3_stmt *pStmt;      /* SQL statement */
 	const char *zSep;         /* Separator string */
-	Str ins;                  /* Beginning of the INSERT statement */
+	Block ins;                  /* Beginning of the INSERT statement */
 
 	pStmt = db_prepare(pDB, "SELECT sql FROM %Q.sqlite_master WHERE name=%Q", zAux, zTab);
 	if (SQLITE_ROW == sqlite3_step(pStmt)){
@@ -395,7 +420,7 @@ static void dump_table(sqlite3 * pDB, const char *zAux, const char *zTab, Str *o
 			strPrintf(&ins, "INSERT INTO %s VALUES", zId);
 		}
 		else{
-			Str sql;
+			Block sql;
 			strInit(&sql);
 			zSep = "SELECT";
 			for (i = 0; az[i]; i++){
@@ -446,7 +471,7 @@ static void dump_table(sqlite3 * pDB, const char *zAux, const char *zTab, Str *o
 /*
 ** Compute all differences for a single table.
 */
-void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab, Str *out)
+void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab, Block *out)
 {
 	char *zId = safeId(zTab); /* Name of table (translated for us in SQL) */
 	char **az = 0;            /* Columns in main */
@@ -458,7 +483,7 @@ void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const ch
 	int nQ;                   /* Number of output columns in the diff query */
 	int i;                    /* Loop counter */
 	const char *zSep;         /* Separator string */
-	Str sql;                  /* Comparison query */
+	Block sql;                  /* Comparison query */
 	sqlite3_stmt *pStmt;      /* Query statement to do the diff */
 
 	strInit(&sql);

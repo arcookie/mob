@@ -43,7 +43,7 @@ static void usage()
 
 static int _create_db(long id, const char * mark, sqlite3 **ppDb)
 {
-	Str fname;
+	Block fname;
 
 	strInit(&fname);
 
@@ -60,7 +60,7 @@ static int _create_db(long id, const char * mark, sqlite3 **ppDb)
 
 static int _close_db(long id, const char * mark, sqlite3 *pDb)
 {
-	Str fname;
+	Block fname;
 	int rc = sqlite3_close(pDb);
 
 	strInit(&fname);
@@ -79,7 +79,7 @@ static int _close_db(long id, const char * mark, sqlite3 *pDb)
 
 void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const char * base, const char * sql)
 {
-	Str undo;
+	Block undo;
 	sqlite3_stmt *pStmt = NULL;
 
 	strInit(&undo);
@@ -212,7 +212,7 @@ void mob_undo_db(unsigned int sid, const char * uid, int snum, const char * base
 int mob_sync_db(sqlite3 * pDb)
 {
 	SYNC_DATA sd;
-	Str undo, redo;
+	Block undo, redo;
 	sqlite3_stmt *pStmt = NULL;
 
 	strInit(&undo);

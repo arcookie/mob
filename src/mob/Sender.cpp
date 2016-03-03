@@ -50,12 +50,6 @@ struct find_id_applies : std::unary_function<RECEIVE, bool> {
 	}
 };
 
-
-static int catmem(char ** data, void * fsi, int len)
-{
-	return 0;
-}
-
 CSender::CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* path) : m_pMob(pMob), BusObject(path), m_pMobSignalMember(NULL)
 {
 	QStatus status;
@@ -250,32 +244,36 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 				printf("%s:(%d) %ssqlite>", msg->GetSender(), iter->second.length, iter->second.body);
 				m_mHangar[iter->second.aid].action = iter->second.action;
 				m_mHangar[iter->second.aid].wid = iter->second.wid;
-				memcpy(m_mHangar[iter->second.aid].body, iter->second.body, iter->second.length);
+				memcpy(m_mHangar[iter->second.aid].body.z, iter->second.body.z, iter->second.length);
 				m_mHangar[iter->second.aid].length = iter->second.length;
 				memcpy(m_mHangar[iter->second.aid].extra, iter->second.extra, TRAIN_EXTRA_LEN);
 				// 
 				break;
 			case ACT_FLIST:
 				if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
-					int n = 0, len = 0;
-					char * data = 0;
-					FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body;
+					int n = 0;
+					Block data;
+					FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body.z;
+
+					strInit(&data);
 
 					while (n < iter->second.length) {
 						//								find pFSI->uri and cpy
 
-						if (catmem(&data, pFSI, sizeof(FILE_SEND_ITEM)) == sizeof(FILE_SEND_ITEM)) len += sizeof(FILE_SEND_ITEM);
+						strCat(&data, (char *)pFSI, sizeof(FILE_SEND_ITEM));
 
 						n += sizeof(FILE_SEND_ITEM);
 						pFSI++;
 					}
-					if (len > 0) SendData(NULL/*iter->second.uid*/, iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data, len); // special target most be assigned.
+					if (data.nUsed > 0) SendData(NULL/*iter->second.uid*/, iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data.z, data.nUsed); // special target most be assigned.
+
+					strFree(&data);
 				}
 				break;
 			case ACT_FLIST_REQ:
 				if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
 					int n = 0;
-					FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body;
+					FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body.z;
 
 					while (n < iter->second.length) {
 						// load pFSI->uri as mem
@@ -300,7 +298,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 					// file:// 를 테이블을 이용하여 변환하여 DB 에 반영
 					// 충돌이 존재하면 롤백
 
-					Save(_iter->second.wid, _iter->second.body, _iter->second.length, _iter->second.extra, TRAIN_EXTRA_LEN);
+					Save(_iter->second.wid, _iter->second.body.z, _iter->second.length, _iter->second.extra, TRAIN_EXTRA_LEN);
 
 					m_mHangar.erase(_iter);
 				}
@@ -310,7 +308,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 			m_mTrain.erase(iter);
 		}
 		else {
-			catmem(&(iter->second.body), (void *)(((int*)data) + 1), size - sizeof(int));
+			strCat(&(iter->second.body), (char *)(((int*)data) + 1), size - sizeof(int));
 			iter->second.length += size - sizeof(int);
 		}
 	}
@@ -376,11 +374,38 @@ QStatus CSender::SendData(const char * sJoinName, int nAID, int nAction, Session
 
 int get_file_mtime(const char * path)
 {
+	HANDLE fh;
+
+	if ((fh = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
+		FILETIME modtime;
+		SYSTEMTIME stUTC;
+		char buf[32];
+
+		GetFileTime(fh, NULL, NULL, &modtime);
+
+		CloseHandle(fh);
+
+		FileTimeToSystemTime(&modtime, &stUTC);
+
+		sprintf(buf, "%02d%02d%02d%02d%02d", stUTC.wMonth, stUTC.wDay, stUTC.wHour, stUTC.wMinute, stUTC.wSecond);
+
+		return atoi(buf);
+	}
+
 	return 0;
 }
 
-long long get_file_length(const char * path)
+long get_file_length(const char * path)
 {
+	FILE *fp;
+	long sz;
+
+	if ((fp = fopen(path, "rb")) != NULL) {
+		fseek(fp, 0, SEEK_END);
+		sz = ftell(fp);
+		fclose(fp);
+		return sz;
+	}
 	return 0L;
 }
 
@@ -390,13 +415,14 @@ int alljoyn_send(SessionId nSID, int nAction, char * sText, int nLength, const c
 	int ret = gpMob->SendData(NULL, aid, nAction, nSID, sText, nLength, pExtra, nExtLen);
 
 	if (sText && ER_OK == ret) {
-		int len = 0, l;
+		int l;
 		char * p = sText;
-		char * data = 0;
+		Block data;
 		char * p2;
 		FILE_SEND_ITEM fsi;
 
-		// ' inside of file:// most be urlencoded.
+		strInit(&data);
+
 		while ((p = strstr(p, "file://")) != NULL) {
 			p += 7;
 			if ((p2 = strchr(p, '\'')) != NULL && (l = (p2 - p)) > 0) {
@@ -406,14 +432,16 @@ int alljoyn_send(SessionId nSID, int nAction, char * sText, int nLength, const c
 					fsi.mtime = get_file_mtime(fsi.uri);
 					fsi.fsize = get_file_length(fsi.uri);
 
-					if (catmem(&data, &fsi, sizeof(FILE_SEND_ITEM)) == sizeof(FILE_SEND_ITEM)) len += sizeof(FILE_SEND_ITEM);
+					strCat(&data, (char *)&fsi, sizeof(FILE_SEND_ITEM));
 				}
 
 				p = p2 + 1;
 			}
 			else p++;
 		}
-		if (len > 0) ret = gpMob->SendData(NULL, aid, ACT_FLIST, nSID, data, len);
+		if (data.nUsed > 0) ret = gpMob->SendData(NULL, aid, ACT_FLIST, nSID, data.z, data.nUsed);
+
+		strFree(&data);
 	}
 
 	return ret;

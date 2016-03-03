@@ -21,15 +21,13 @@
 extern "C" {
 #endif
 
-	/* string utility functions */
+	/* memory block utility functions */
 
-	typedef struct Str Str;
-
-	struct Str {
+	typedef struct {
 		char *z;        /* Text of the string */
 		int nAlloc;     /* Bytes allocated in z[] */
 		int nUsed;      /* Bytes actually used in z[] */
-	};
+	} Block;
 
 	typedef struct {
 		int sn;
@@ -45,11 +43,12 @@ extern "C" {
 		char uid[16];
 	} SYNC_SIGNAL;
 
-	extern void strInit(Str *p);
-	extern void strFree(Str *p);
-	extern int strPrintf(Str *p, const char *zFormat, ...);
+	extern void strInit(Block *p);
+	extern void strFree(Block *p);
+	extern int strCat(Block *p, const char * z, int n);
+	extern int strPrintf(Block *p, const char *zFormat, ...);
 	sqlite3_stmt *db_prepare(sqlite3 * pDB, const char *zFormat, ...);
-	void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab, Str *out);
+	void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab, Block *out);
 
 	/* alljoyn related functions */
 

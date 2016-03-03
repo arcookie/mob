@@ -31,6 +31,7 @@
 #include <alljoyn/BusObject.h>
 #include <vector>
 #include <map>
+#include "mob.h"
 
 using namespace ajn;
 
@@ -70,10 +71,10 @@ class TRAIN {
 public:
 	TRAIN() {
 		length = 0;
-		body = NULL;
+		strInit(&body);
 	}
 	~TRAIN() {
-		if (body) delete body;
+		strFree(&body);
 	}
 
 	int aid;  // action id
@@ -81,13 +82,13 @@ public:
 	int action; // 0 data, 1 file list 2 file list req 3 file
 	int length;
 	char extra[TRAIN_EXTRA_LEN];
-	char * body;
+	Block body;
 };
 
 typedef struct {
 	char uri[MAX_URI];
 	int mtime;
-	long long fsize;
+	long fsize;
 
 } FILE_SEND_ITEM;
 
