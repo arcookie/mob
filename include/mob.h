@@ -22,7 +22,7 @@ extern "C" {
 #endif
 
 	/* memory block utility functions */
-
+	 
 	typedef struct {
 		char *z;        /* Text of the string */
 		int nAlloc;     /* Bytes allocated in z[] */
@@ -43,9 +43,9 @@ extern "C" {
 		char uid[16];
 	} SYNC_SIGNAL;
 
-	extern void strInit(Block *p);
-	extern void strFree(Block *p);
-	extern int strCat(Block *p, const char * z, int n);
+	extern void blkInit(Block *p);
+	extern void blkFree(Block *p);
+	extern int memCat(Block *p, const char * z, int n);
 	extern int strPrintf(Block *p, const char *zFormat, ...);
 	sqlite3_stmt *db_prepare(sqlite3 * pDB, const char *zFormat, ...);
 	void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab, Block *out);

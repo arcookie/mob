@@ -87,7 +87,7 @@ static char *safeId(const char *zId){
 /*
 ** Initialize a Block object
 */
-void strInit(Block *p)
+void blkInit(Block *p)
 {
 	p->z = 0;
 	p->nAlloc = 0;
@@ -97,10 +97,10 @@ void strInit(Block *p)
 /*
 ** Free all memory held by a Block object
 */
-void strFree(Block *p)
+void blkFree(Block *p)
 {
 	sqlite3_free(p->z);
-	strInit(p);
+	blkInit(p);
 }
 
 /*
@@ -134,7 +134,7 @@ int strPrintf(Block *p, const char *zFormat, ...)
 /*
 ** Add memory to the end of a Block object
 */
-int strCat(Block *p, const char * z, int n)
+int memCat(Block *p, const char * z, int n)
 {
 	int nNew;
 	for (;;){
@@ -414,14 +414,14 @@ static void dump_table(sqlite3 * pDB, const char *zAux, const char *zTab, Block 
 	sqlite3_finalize(pStmt);
 //	if (!g.bSchemaOnly){
 	az = columnNames(pDB, zAux, zTab, &nPk, 0);
-		strInit(&ins);
+		blkInit(&ins);
 		if (az == 0){
 			pStmt = db_prepare(pDB, "SELECT * FROM %s.%s", zAux, zId);
 			strPrintf(&ins, "INSERT INTO %s VALUES", zId);
 		}
 		else{
 			Block sql;
-			strInit(&sql);
+			blkInit(&sql);
 			zSep = "SELECT";
 			for (i = 0; az[i]; i++){
 				strPrintf(&sql, "%s %s", zSep, az[i]);
@@ -434,7 +434,7 @@ static void dump_table(sqlite3 * pDB, const char *zAux, const char *zTab, Block 
 				zSep = ",";
 			}
 			pStmt = db_prepare(pDB, "%s", sql.z);
-			strFree(&sql);
+			blkFree(&sql);
 			strPrintf(&ins, "INSERT INTO %s", zId);
 			zSep = "(";
 			for (i = 0; az[i]; i++){
@@ -456,7 +456,7 @@ static void dump_table(sqlite3 * pDB, const char *zAux, const char *zTab, Block 
 			strPrintf(out, ");\n");
 		}
 		sqlite3_finalize(pStmt);
-		strFree(&ins);
+		blkFree(&ins);
 //	} /* endif !g.bSchemaOnly */
 		pStmt = db_prepare(pDB, "SELECT sql FROM %Q.sqlite_master"
 		" WHERE type='index' AND tbl_name=%Q AND sql IS NOT NULL",
@@ -486,7 +486,7 @@ void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const ch
 	Block sql;                  /* Comparison query */
 	sqlite3_stmt *pStmt;      /* Query statement to do the diff */
 
-	strInit(&sql);
+	blkInit(&sql);
 
 	if (sqlite3_table_column_metadata(pDB, zAux, zTab, 0, 0, 0, 0, 0, 0)){
 		if (!sqlite3_table_column_metadata(pDB, zMain, zTab, 0, 0, 0, 0, 0, 0)){
@@ -689,7 +689,7 @@ void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const ch
 	sqlite3_finalize(pStmt);
 
 end_diff_one_table:
-	strFree(&sql);
+	blkFree(&sql);
 	sqlite3_free(zId);
 	namelistFree(az);
 	namelistFree(az2);

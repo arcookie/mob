@@ -255,19 +255,19 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 					Block data;
 					FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body.z;
 
-					strInit(&data);
+					blkInit(&data);
 
 					while (n < iter->second.length) {
 						//								find pFSI->uri and cpy
 
-						strCat(&data, (char *)pFSI, sizeof(FILE_SEND_ITEM));
+						memCat(&data, (char *)pFSI, sizeof(FILE_SEND_ITEM));
 
 						n += sizeof(FILE_SEND_ITEM);
 						pFSI++;
 					}
 					if (data.nUsed > 0) SendData(NULL/*iter->second.uid*/, iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data.z, data.nUsed); // special target most be assigned.
 
-					strFree(&data);
+					blkFree(&data);
 				}
 				break;
 			case ACT_FLIST_REQ:
@@ -308,7 +308,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 			m_mTrain.erase(iter);
 		}
 		else {
-			strCat(&(iter->second.body), (char *)(((int*)data) + 1), size - sizeof(int));
+			memCat(&(iter->second.body), (char *)(((int*)data) + 1), size - sizeof(int));
 			iter->second.length += size - sizeof(int);
 		}
 	}
@@ -421,7 +421,7 @@ int alljoyn_send(SessionId nSID, int nAction, char * sText, int nLength, const c
 		char * p2;
 		FILE_SEND_ITEM fsi;
 
-		strInit(&data);
+		blkInit(&data);
 
 		while ((p = strstr(p, "file://")) != NULL) {
 			p += 7;
@@ -432,7 +432,7 @@ int alljoyn_send(SessionId nSID, int nAction, char * sText, int nLength, const c
 					fsi.mtime = get_file_mtime(fsi.uri);
 					fsi.fsize = get_file_length(fsi.uri);
 
-					strCat(&data, (char *)&fsi, sizeof(FILE_SEND_ITEM));
+					memCat(&data, (char *)&fsi, sizeof(FILE_SEND_ITEM));
 				}
 
 				p = p2 + 1;
@@ -441,7 +441,7 @@ int alljoyn_send(SessionId nSID, int nAction, char * sText, int nLength, const c
 		}
 		if (data.nUsed > 0) ret = gpMob->SendData(NULL, aid, ACT_FLIST, nSID, data.z, data.nUsed);
 
-		strFree(&data);
+		blkFree(&data);
 	}
 
 	return ret;

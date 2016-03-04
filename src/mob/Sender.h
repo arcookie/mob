@@ -71,10 +71,10 @@ class TRAIN {
 public:
 	TRAIN() {
 		length = 0;
-		strInit(&body);
+		blkInit(&body);
 	}
 	~TRAIN() {
-		strFree(&body);
+		blkFree(&body);
 	}
 
 	int aid;  // action id

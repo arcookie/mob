@@ -45,7 +45,7 @@ static int _create_db(long id, const char * mark, sqlite3 **ppDb)
 {
 	Block fname;
 
-	strInit(&fname);
+	blkInit(&fname);
 
 	strPrintf(&fname, "%ld_%s.db3", id, mark);
 
@@ -53,7 +53,7 @@ static int _create_db(long id, const char * mark, sqlite3 **ppDb)
 
 	int rc = sqlite3_open(fname.z, ppDb);
 
-	strFree(&fname);
+	blkFree(&fname);
 
 	return rc;
 }
@@ -63,13 +63,13 @@ static int _close_db(long id, const char * mark, sqlite3 *pDb)
 	Block fname;
 	int rc = sqlite3_close(pDb);
 
-	strInit(&fname);
+	blkInit(&fname);
 
 	strPrintf(&fname, "%ld_%s.db3", id, mark);
 
 	_unlink(fname.z);
 
-	strFree(&fname);
+	blkFree(&fname);
 
 	return rc;
 }
@@ -82,7 +82,7 @@ void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const ch
 	Block undo;
 	sqlite3_stmt *pStmt = NULL;
 
-	strInit(&undo);
+	blkInit(&undo);
 
 	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, ptr_back, ptr_undo FROM works WHERE num=%d", sid),
 		sqlite3 * pDB = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
@@ -96,7 +96,7 @@ void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const ch
 		break;
 	);
 
-	strFree(&undo);
+	blkFree(&undo);
 }
 
 int mob_init(int argc, char** argv)
@@ -215,8 +215,8 @@ int mob_sync_db(sqlite3 * pDb)
 	Block undo, redo;
 	sqlite3_stmt *pStmt = NULL;
 
-	strInit(&undo);
-	strInit(&redo);
+	blkInit(&undo);
+	blkInit(&redo);
 
 	QUERY_SQL_V(master_db, pStmt, ("SELECT num, uid, ptr_back, ptr_undo FROM works WHERE ptr_main = %ld;", (long)pDb),
 		int wid = sqlite3_column_int(pStmt, 0);
@@ -253,8 +253,8 @@ int mob_sync_db(sqlite3 * pDb)
 
 				alljoyn_send(wid, ACT_DATA, redo.z, redo.nUsed, (const char *)&sd, sizeof(SYNC_DATA));
 
-				strFree(&redo);
-				strFree(&undo);
+				blkFree(&redo);
+				blkFree(&undo);
 			}
 			sqlite3_finalize(pStmt2);
 
@@ -262,8 +262,8 @@ int mob_sync_db(sqlite3 * pDb)
 		);
 	}
 
-	strFree(&redo);
-	strFree(&undo);
+	blkFree(&redo);
+	blkFree(&undo);
 
 	return 0;
 }
