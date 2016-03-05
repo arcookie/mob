@@ -92,6 +92,7 @@
     <ClCompile Include="..\src\mob\MobBusListener.cpp" />
     <ClCompile Include="..\src\mob\MobClient.cpp" />
     <ClCompile Include="..\src\mob\MobServer.cpp" />
+    <ClCompile Include="..\src\mob\Receiver.cpp" />
     <ClCompile Include="..\src\mob\Sender.cpp" />
     <ClCompile Include="..\src\mob\sqldiff.c" />
   </ItemGroup>
