@@ -55,7 +55,8 @@ extern "C" {
 	void alljoyn_disconnect(void);
 	int alljoyn_connect(const char * advertisedName, const char * joinName);
 
-	int alljoyn_send(unsigned int nSID, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen);
+	int alljoyn_send(unsigned int nSID, const char * pJoiner, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen);
+	void mob_send_missed_db(unsigned int sid, const char * uid_to, const char * having);
 
 	int alljoyn_session_id();
 	const char * alljoyn_join_name();

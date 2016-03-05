@@ -129,21 +129,21 @@ CSender::CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* path) : m_p
 	}
 }
 
-CSender::~CSender()
+const char * CSender::GetLocalPath(SessionId nSID, const char * pJoiner, const char * sURI)
 {
-	mReceives::iterator miter;
-	vReceives::iterator viter;
+	vRecvFiles::iterator itFiles;
 
-	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
-		for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
-			delete (*viter).data;
-		}
-	}
+	if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(nSID, pJoiner, sURI))) != gRecvFiles.end()) 
+		return (*itFiles).path.data();
+	else return NULL;
 }
 
-void CSender::Save(SessionId nSID, const char * sText, int nLength, const char * pExtra, int nExtLen)
+void CSender::Save(SessionId nSID, const char * pJoiner, char * sText, int nLength, const char * pExtra, int nExtLen)
 {
 	RECEIVE rcv;
+	std::string p;
+	size_t start_pos;
+	size_t end_pos;
 	mReceives::iterator miter;
 	vReceives::iterator viter;
 	SYNC_DATA * pSD = (SYNC_DATA *)pExtra;
@@ -155,6 +155,15 @@ void CSender::Save(SessionId nSID, const char * sText, int nLength, const char *
 	rcv.sn_s = pSD->sn;
 	rcv.sn_e = pSD->sn;
 	rcv.data = sText;
+
+	while ((start_pos = rcv.data.find("file://", start_pos)) != std::string::npos) {
+		if ((end_pos = rcv.data.find("\'", start_pos)) != std::string::npos) {
+			p.assign(GetLocalPath(nSID, pJoiner, rcv.data.substr(start_pos, end_pos - start_pos).data()));
+			rcv.data.replace(start_pos, end_pos - start_pos, p);
+			start_pos += p.length();
+		}
+		else start_pos += 7;
+	}
 
 	m_mReceives[pSD->base].push_back(rcv);
 
@@ -200,7 +209,7 @@ void CSender::Apply(SessionId nSID)
 		vApplies applies;
 
 		for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
-			if ((*vRcvIt).data && (n = mob_find_parent_db(nSID, (*vRcvIt).uid_p.data(), (*vRcvIt).snum_p, mRcvIt->first.data())) > num) num = n;
+			if (!(*vRcvIt).data.empty() && (n = mob_find_parent_db(nSID, (*vRcvIt).uid_p.data(), (*vRcvIt).snum_p, mRcvIt->first.data())) > num) num = n;
 		}
 
 		while ((num = mob_get_db(nSID, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, mRcvIt->first.data(), sd.uid_p, sd.snum_p, TRUE);
@@ -210,9 +219,9 @@ void CSender::Apply(SessionId nSID)
 		do {
 			bWorked = FALSE;
 			for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
-				if ((*vRcvIt).data && PushApply(applies, mRcvIt->first.data(), (*vRcvIt).uid_p.data(), (*vRcvIt).snum_p, bFirst)) {
+				if (!(*vRcvIt).data.empty() && PushApply(applies, mRcvIt->first.data(), (*vRcvIt).uid_p.data(), (*vRcvIt).snum_p, bFirst)) {
 					bFirst = FALSE;
-					(*vRcvIt).data = NULL;
+					(*vRcvIt).data.clear();
 
 					vReceives::iterator it = std::find_if(mRcvIt->second.begin(), mRcvIt->second.end(), find_id((*vRcvIt).uid, (*vRcvIt).sn_e - 1));
 
@@ -247,15 +256,19 @@ void CSender::MissingCheck()
 {
 	std::map<qcc::String, qcc::String> miss;
 	{
+		qcc::String s;
 		mReceives::iterator miter;
 		vReceives::iterator viter;
 
 		for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
+			s = "";
 			for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
 				if ((*viter).sn_s != (*viter).sn_e && (*viter).sn_e > 1 && std::find_if(miter->second.begin(), miter->second.end(), find_id((*viter).uid, (*viter).sn_e - 1)) == miter->second.end()) {
-					miss[(*viter).uid] += "|" + qcc::I32ToString((*viter).sn_e - 1) + "|";
+					if (s != "") s += ",";
+					s += qcc::I32ToString((*viter).sn_e - 1);
 				}
 			}
+			if (!s.empty()) miss[(*viter).uid] = s;
 		}
 	}
 	{
@@ -291,9 +304,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 		if (size == sizeof(int) * 2) {
 			switch (iter->second.action) {
 			case ACT_MISSING:
-				// undo DB 에서 uid, snum 을 찾아 타킷 발송.
-				//SendData(msg->GetSender(), iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data, len); // special target most be assigned.
-
+				mob_send_missed_db(iter->second.wid, msg->GetSender(), iter->second.body.z);
 				break;
 			case ACT_DATA:
 				printf("%s:(%d) %ssqlite>", msg->GetSender(), iter->second.length, iter->second.body);
@@ -302,7 +313,6 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 				memcpy(m_mHangar[iter->second.aid].body.z, iter->second.body.z, iter->second.length);
 				m_mHangar[iter->second.aid].length = iter->second.length;
 				memcpy(m_mHangar[iter->second.aid].extra, iter->second.extra, TRAIN_EXTRA_LEN);
-				// 
 				break;
 			case ACT_FLIST:
 				if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
@@ -368,7 +378,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 				std::map<int, TRAIN>::iterator _iter;
 
 				if ((_iter = m_mHangar.find(iter->second.aid)) != m_mHangar.end()){
-					Save(_iter->second.wid, _iter->second.body.z, _iter->second.length, _iter->second.extra, TRAIN_EXTRA_LEN);
+					Save(_iter->second.wid, msg->GetSender(), _iter->second.body.z, _iter->second.length, _iter->second.extra, TRAIN_EXTRA_LEN);
 					m_mHangar.erase(_iter);
 				}
 			}
@@ -416,7 +426,6 @@ QStatus CSender::SendData(const char * sJoinName, int nAID, int nAction, Session
 	th.wid = wid;
 	th.action = nAction;
 	th.chain = time(NULL);
-	//	th.chain |= s_user_id; // indivisualize using by user id
 
 	if (pExtra) memcpy(th.extra, pExtra, nExtLen);
 
@@ -459,7 +468,6 @@ QStatus CSender::SendFile(const char * sJoinName, int nAID, int nAction, Session
 		th.wid = wid;
 		th.action = nAction;
 		th.chain = time(NULL);
-		//	th.chain |= s_user_id; // indivisualize using by user id
 
 		fsi.fsize = get_file_length(sPath);
 		fsi.mtime = get_file_mtime(sPath);
@@ -481,10 +489,10 @@ QStatus CSender::SendFile(const char * sJoinName, int nAID, int nAction, Session
 	return status;
 }
 
-int alljoyn_send(SessionId nSID, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen)
+int alljoyn_send(SessionId nSID, const char * pJoiner, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen)
 {
 	time_t aid = time(NULL);
-	int ret = gpMob->SendData(NULL, aid, nAction, nSID, sText, nLength, pExtra, nExtLen);
+	int ret = gpMob->SendData(pJoiner, aid, nAction, nSID, sText, nLength, pExtra, nExtLen);
 
 	if (sText && ER_OK == ret) {
 		int l;
@@ -511,7 +519,7 @@ int alljoyn_send(SessionId nSID, int nAction, char * sText, int nLength, const c
 			}
 			else p++;
 		}
-		if (data.nUsed > 0) ret = gpMob->SendData(NULL, aid, ACT_FLIST, nSID, data.z, data.nUsed);
+		if (data.nUsed > 0) ret = gpMob->SendData(pJoiner, aid, ACT_FLIST, nSID, data.z, data.nUsed);
 
 		blkFree(&data);
 	}

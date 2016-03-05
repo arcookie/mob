@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "mob.h"
 
@@ -209,6 +210,33 @@ void mob_undo_db(unsigned int sid, const char * uid, int snum, const char * base
 	);
 }
 
+void mob_send_missed_db(unsigned int sid, const char * pJoiner, const char * having)
+{
+	sqlite3_stmt *pStmt = NULL;
+	sqlite3_stmt *pStmt2 = NULL;
+	sqlite3_stmt *pStmt3 = NULL;
+	SYNC_DATA sd;
+
+	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_undo, uid FROM works WHERE num=%d", sid),
+		sqlite3 * pDBUndo = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
+
+		strcpy_s(sd.uid, sizeof(sd.uid), sqlite3_column_text(pStmt, 1));
+
+		QUERY_SQL_V(pDBUndo, pStmt2, ("SELECT num, sn, snum, base, undo FROM works WHERE uid=%Q AND sn IN (%s)", sd.uid, having),
+			sd.sn = sqlite3_column_int(pStmt2, 1);
+			sd.snum = sqlite3_column_int(pStmt2, 2);
+			strcpy_s(sd.base, sizeof(sd.base), sqlite3_column_text(pStmt2, 3));
+			QUERY_SQL_V(pDBUndo, pStmt3, ("SELECT uid, snum FROM works WHERE num > %d AND base=%Q ORDER BY num DESC LIMIT 1", sqlite3_column_int(pStmt2, 0), sd.base),
+				strcpy_s(sd.uid_p, sizeof(sd.uid_p), sqlite3_column_text(pStmt3, 0));
+				sd.snum_p = sqlite3_column_int(pStmt3, 1);
+				alljoyn_send(sid, pJoiner, ACT_DATA, sqlite3_column_text(pStmt2, 4), sqlite3_column_bytes(pStmt2, 4), (const char *)&sd, sizeof(SYNC_DATA));
+				break;
+			);
+		);
+		break;
+	);
+}
+
 int mob_sync_db(sqlite3 * pDb)
 {
 	SYNC_DATA sd;
@@ -225,17 +253,17 @@ int mob_sync_db(sqlite3 * pDb)
 		sqlite3_stmt *pStmt2 = db_prepare(pDb, "SELECT name FROM main.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' UNION\n"
 			"SELECT name FROM aux.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' ORDER BY name");
 
-		strcpy(sd.uid, sqlite3_column_text(pStmt, 1));
-		strcpy(sd.uid_p, sd.uid);
+		strcpy_s(sd.uid, sizeof(sd.uid), sqlite3_column_text(pStmt, 1));
+		strcpy_s(sd.uid_p, sizeof(sd.uid_p), sd.uid);
 
 		while (SQLITE_ROW == sqlite3_step(pStmt2)){
-			strcpy(sd.base, (const char*)sqlite3_column_text(pStmt2, 0));
+			strcpy_s(sd.base, sizeof(sd.base), (const char*)sqlite3_column_text(pStmt2, 0));
 			diff_one_table(pDb, "main", "aux", sd.base, &undo);
 
 			if (undo.z){
 				sd.snum_p = -1;
 				QUERY_SQL_V(pUndoDb, pStmt2, ("SELECT uid, snum FROM works WHERE base = %Q ORDER BY num DESC LIMIT 1;", sd.base),
-					strcpy(sd.uid_p, sqlite3_column_text(pStmt2, 0));
+					strcpy_s(sd.uid_p, sizeof(sd.uid_p), sqlite3_column_text(pStmt2, 0));
 					sd.snum_p = sqlite3_column_int(pStmt2, 1);
 					break;
 				);
@@ -251,7 +279,7 @@ int mob_sync_db(sqlite3 * pDb)
 
 				EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (uid, sn, snum, base, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", sd.uid, sd.sn, sd.snum, sd.base, undo.z, redo.z));
 
-				alljoyn_send(wid, ACT_DATA, redo.z, redo.nUsed, (const char *)&sd, sizeof(SYNC_DATA));
+				alljoyn_send(wid, NULL, ACT_DATA, redo.z, redo.nUsed, (const char *)&sd, sizeof(SYNC_DATA));
 
 				blkFree(&redo);
 				blkFree(&undo);
@@ -275,9 +303,9 @@ void mob_signal_db(unsigned int sid)
 	sqlite3_stmt *pStmt2 = NULL;
 
 	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, uid FROM works WHERE num=%d", sid),
-		strcpy(ss.uid, sqlite3_column_text(pStmt, 1));
+		strcpy_s(ss.uid, sizeof(ss.uid), sqlite3_column_text(pStmt, 1));
 		QUERY_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 0), pStmt2, ("SELECT MAX(sn) AS n FROM works WHERE uid = %Q;", ss.uid),
-			alljoyn_send(sid, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+			alljoyn_send(sid, NULL, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
 			break;
 		);
 		break;

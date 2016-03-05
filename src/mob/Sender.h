@@ -109,7 +109,7 @@ typedef struct {
 	int snum_p;
 	int sn_s;
 	int sn_e;
-	const char * data;
+	std::string data;
 } RECEIVE;
 
 typedef struct {
@@ -148,7 +148,6 @@ class CSender : public BusObject {
 public:
 
 	CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* path);
-	~CSender();
 
 	QStatus _Send(SessionId nSID, const char * sJoinName, int nChain, const char * pData, int nLength);
 
@@ -158,7 +157,8 @@ public:
 	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
 	void MissingCheck();
-	void Save(SessionId nSID, const char * sText, int nLength, const char * pExtra, int nExtLen);
+	const char * GetLocalPath(SessionId nSID, const char * pJoiner, const char * sURI);
+	void Save(SessionId nSID, const char * pJoiner, char * sText, int nLength, const char * pExtra, int nExtLen);
 	void OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg);
 
 	virtual void GetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}
