@@ -89,8 +89,18 @@ typedef struct {
 	char uri[MAX_URI];
 	int mtime;
 	long fsize;
-
 } FILE_SEND_ITEM;
+
+typedef struct {
+	int wid;
+	int mtime;
+	long fsize;
+	qcc::String uid;
+	qcc::String uri;
+	qcc::String path;
+} FILE_RECV_ITEM;
+
+typedef std::vector<FILE_RECV_ITEM>		vRecvFiles;
 
 typedef struct {
 	qcc::String uid;
@@ -144,6 +154,7 @@ public:
 
 	void Apply(SessionId nSID);
 	BOOL PushApply(vApplies & applies, const char * base, const char * uid_p, int snum_p, BOOL bFirst);
+	QStatus SendFile(const char * sJoinName, int nAID, int nAction, SessionId wid, LPCSTR sPath);
 	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
 	void MissingCheck();

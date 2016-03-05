@@ -32,6 +32,23 @@
 #include "Sender.h"
 #include "AlljoynMob.h"
 
+vRecvFiles gRecvFiles;
+
+struct find_uri : std::unary_function<FILE_RECV_ITEM, bool> {
+	int wid;
+	qcc::String uid;
+	qcc::String uri;
+
+	find_uri(int nDocID, const char * pJoiner, const char * pURI){
+		wid = nDocID;
+		uid = pJoiner;
+		uri = pURI;
+	}
+	bool operator()(FILE_RECV_ITEM const& m) const {
+		return (m.wid == wid && m.uid == uid && m.uri == uri);
+	}
+};
+
 struct find_id : std::unary_function<RECEIVE, bool> {
 	int snum;
 	qcc::String uid;
@@ -49,6 +66,44 @@ struct find_id_applies : std::unary_function<RECEIVE, bool> {
 		return (m.uid_p == uid_p && m.snum_p == snum_p);
 	}
 };
+
+
+int get_file_mtime(const char * path)
+{
+	HANDLE fh;
+
+	if ((fh = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
+		FILETIME modtime;
+		SYSTEMTIME stUTC;
+		char buf[32];
+
+		GetFileTime(fh, NULL, NULL, &modtime);
+
+		CloseHandle(fh);
+
+		FileTimeToSystemTime(&modtime, &stUTC);
+
+		sprintf(buf, "%02d%02d%02d%02d%02d", stUTC.wMonth, stUTC.wDay, stUTC.wHour, stUTC.wMinute, stUTC.wSecond);
+
+		return atoi(buf);
+	}
+
+	return 0;
+}
+
+long get_file_length(const char * path)
+{
+	FILE *fp;
+	long sz;
+
+	if ((fp = fopen(path, "rb")) != NULL) {
+		fseek(fp, 0, SEEK_END);
+		sz = ftell(fp);
+		fclose(fp);
+		return sz;
+	}
+	return 0L;
+}
 
 CSender::CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* path) : m_pMob(pMob), BusObject(path), m_pMobSignalMember(NULL)
 {
@@ -198,7 +253,7 @@ void CSender::MissingCheck()
 		for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
 			for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
 				if ((*viter).sn_s != (*viter).sn_e && (*viter).sn_e > 1 && std::find_if(miter->second.begin(), miter->second.end(), find_id((*viter).uid, (*viter).sn_e - 1)) == miter->second.end()) {
-					miss[(*viter).uid] += qcc::I32ToString((*viter).sn_e - 1) + "|";
+					miss[(*viter).uid] += "|" + qcc::I32ToString((*viter).sn_e - 1) + "|";
 				}
 			}
 		}
@@ -237,7 +292,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 			switch (iter->second.action) {
 			case ACT_MISSING:
 				// undo DB 에서 uid, snum 을 찾아 타킷 발송.
-				//SendData(NULL/*iter->second.uid*/, iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data, len); // special target most be assigned.
+				//SendData(msg->GetSender(), iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data, len); // special target most be assigned.
 
 				break;
 			case ACT_DATA:
@@ -253,19 +308,21 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 				if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
 					int n = 0;
 					Block data;
+					vRecvFiles::iterator itFiles;
 					FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body.z;
 
 					blkInit(&data);
 
 					while (n < iter->second.length) {
-						//								find pFSI->uri and cpy
-
+						if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(iter->second.wid, msg->GetSender(), pFSI->uri))) != gRecvFiles.end()) {
+							if ((*itFiles).mtime == pFSI->mtime && (*itFiles).mtime == pFSI->mtime) continue;
+						}
 						memCat(&data, (char *)pFSI, sizeof(FILE_SEND_ITEM));
 
 						n += sizeof(FILE_SEND_ITEM);
 						pFSI++;
 					}
-					if (data.nUsed > 0) SendData(NULL/*iter->second.uid*/, iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data.z, data.nUsed); // special target most be assigned.
+					if (data.nUsed > 0) SendData(msg->GetSender(), iter->second.aid, ACT_FLIST_REQ, iter->second.wid, data.z, data.nUsed); // special target most be assigned.
 
 					blkFree(&data);
 				}
@@ -276,30 +333,42 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 					FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body.z;
 
 					while (n < iter->second.length) {
-						// load pFSI->uri as mem
-						char * fmem = 0;
-						int fsize = 0;
-						SendData(NULL/*iter->second.uid*/, iter->second.aid, ACT_FILE, iter->second.wid, fmem, fsize);// special target most be assigned.
+						SendFile(msg->GetSender(), iter->second.aid, ACT_FILE, iter->second.wid, pFSI->uri);
 						n += sizeof(FILE_SEND_ITEM);
 						pFSI++;
 					}
-					SendData(NULL/*iter->second.uid*/, iter->second.aid, ACT_END, iter->second.wid, 0, 0);// special target most be assigned.
+					SendData(msg->GetSender(), iter->second.aid, ACT_END, iter->second.wid, 0, 0);// special target most be assigned.
 				}
 				break;
 			case ACT_FILE:
-				// save as file of data and register in file list table(or map).
+			{
+				vRecvFiles::iterator itFiles;
+				FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.extra;
+
+				if (pFSI) {
+					FILE_RECV_ITEM fri;
+
+					if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(iter->second.wid, msg->GetSender(), pFSI->uri))) != gRecvFiles.end())
+						gRecvFiles.erase(itFiles);
+
+					fri.fsize = pFSI->fsize;
+					fri.mtime = pFSI->mtime;
+					fri.uri = pFSI->uri;
+					fri.uid = msg->GetSender();
+					fri.wid = iter->second.wid;
+
+					// fri.path save
+
+					gRecvFiles.push_back(fri);
+				}
+			}
 				break;
 			case ACT_END:
 			{
 				std::map<int, TRAIN>::iterator _iter;
 
 				if ((_iter = m_mHangar.find(iter->second.aid)) != m_mHangar.end()){
-
-					// file:// 를 테이블을 이용하여 변환하여 DB 에 반영
-					// 충돌이 존재하면 롤백
-
 					Save(_iter->second.wid, _iter->second.body.z, _iter->second.length, _iter->second.extra, TRAIN_EXTRA_LEN);
-
 					m_mHangar.erase(_iter);
 				}
 			}
@@ -372,41 +441,44 @@ QStatus CSender::SendData(const char * sJoinName, int nAID, int nAction, Session
 	return status;
 }
 
-int get_file_mtime(const char * path)
-{
-	HANDLE fh;
-
-	if ((fh = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
-		FILETIME modtime;
-		SYSTEMTIME stUTC;
-		char buf[32];
-
-		GetFileTime(fh, NULL, NULL, &modtime);
-
-		CloseHandle(fh);
-
-		FileTimeToSystemTime(&modtime, &stUTC);
-
-		sprintf(buf, "%02d%02d%02d%02d%02d", stUTC.wMonth, stUTC.wDay, stUTC.wHour, stUTC.wMinute, stUTC.wSecond);
-
-		return atoi(buf);
-	}
-
-	return 0;
-}
-
-long get_file_length(const char * path)
+QStatus CSender::SendFile(const char * sJoinName, int nAID, int nAction, SessionId wid, LPCSTR sPath)
 {
 	FILE *fp;
-	long sz;
+	QStatus status = ER_OK;
 
-	if ((fp = fopen(path, "rb")) != NULL) {
-		fseek(fp, 0, SEEK_END);
-		sz = ftell(fp);
+	if ((fp = fopen(sPath, "rb")) != NULL) {
+		int l;
+		BYTE Buf[SEND_BUF];
+		TRAIN_HEADER th;
+		uint8_t flags = 0;
+		FILE_SEND_ITEM fsi;
+
+		TRAIN_HEADER(th.marks);
+
+		th.aid = nAID;
+		th.wid = wid;
+		th.action = nAction;
+		th.chain = time(NULL);
+		//	th.chain |= s_user_id; // indivisualize using by user id
+
+		fsi.fsize = get_file_length(sPath);
+		fsi.mtime = get_file_mtime(sPath);
+		memcpy(fsi.uri, sPath, strlen(sPath));
+
+		memcpy(th.extra, (const char *)&fsi, sizeof(FILE_SEND_ITEM));
+
+		MsgArg mobArg("ay", sizeof(TRAIN_HEADER), &th);
+
+		if ((status = Signal(sJoinName, wid, *m_pMobSignalMember, &mobArg, 1, 0, flags)) == ER_OK) {
+			while ((l = fread(Buf, sizeof(BYTE), SEND_BUF, fp)) > 0) {
+				if ((status = _Send(wid, sJoinName, th.chain, (const char *)Buf, l)) != ER_OK) break;
+			}
+			_Send(wid, sJoinName, th.chain, 0, -1);
+		}
+
 		fclose(fp);
-		return sz;
 	}
-	return 0L;
+	return status;
 }
 
 int alljoyn_send(SessionId nSID, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen)
