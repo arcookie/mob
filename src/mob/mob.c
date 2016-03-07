@@ -156,7 +156,7 @@ void mob_exit(void)
 int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 {
 	if (!master_db && sqlite3_open(":memory:", &master_db) == SQLITE_OK)
-		sqlite3_exec(master_db, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid CHAR(16), ptr_main BIGINT, ptr_back BIGINT, ptr_undo BIGINT); PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+		sqlite3_exec(master_db, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid CHAR(16), sn INT DEFAULT 0, ptr_main BIGINT, ptr_back BIGINT, ptr_undo BIGINT); PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 	else {
 		master_db = 0;
 		return SQLITE_ERROR;
@@ -296,16 +296,23 @@ int mob_sync_db(sqlite3 * pDb)
 	return 0;
 }
 
+void mob_no_missed_db(unsigned int sid, const char * snum)
+{
+	EXECUTE_SQL_V(master_db, ("UPDATE works SET sn=%s WHERE num=%d;", snum, sid));
+}
+
 void mob_signal_db(unsigned int sid)
 {
 	SYNC_SIGNAL ss;
 	sqlite3_stmt *pStmt = NULL;
 	sqlite3_stmt *pStmt2 = NULL;
 
-	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, uid FROM works WHERE num=%d", sid),
+	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, uid, sn FROM works WHERE num=%d", sid),
 		strcpy_s(ss.uid, sizeof(ss.uid), sqlite3_column_text(pStmt, 1));
 		QUERY_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 0), pStmt2, ("SELECT MAX(sn) AS n FROM works WHERE uid = %Q;", ss.uid),
-			alljoyn_send(sid, NULL, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+			ss.sn = sqlite3_column_int(pStmt2, 0);
+
+			if (ss.sn != sqlite3_column_int(pStmt, 0)) alljoyn_send(sid, NULL, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
 			break;
 		);
 		break;

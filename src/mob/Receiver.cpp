@@ -32,9 +32,6 @@
 #include "Sender.h"
 #include "AlljoynMob.h"
 
-#define TM_MISSING_CHECK	1
-#define INT_MISSING_CHECK	2000
-
 extern qcc::String gWPath;
 
 struct find_id : std::unary_function<RECEIVE, bool> {
@@ -293,6 +290,23 @@ const qcc::String mem2tmpfile(const char * data, int length, const qcc::String e
 	return "";
 }
 
+void CSender::MissingCheck(const char * sUID, int nSNum)
+{
+	mReceives::iterator miter;
+	vReceives::iterator viter;
+	qcc::String s = qcc::I32ToString(nSNum);
+
+	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
+		for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
+			if (!((*viter).sn_s <= nSNum && (*viter).sn_e >= nSNum && (*viter).uid == sUID)) {
+				m_pMob->SendData(sUID, time(NULL), ACT_MISSING, m_pMob->GetSessionID(), s.data(), s.size());
+				return;
+			}
+		}
+	}
+	m_pMob->SendData(sUID, time(NULL), ACT_NO_MISSED, m_pMob->GetSessionID(), s.data(), s.size());
+}
+
 void CSender::OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg)
 {
 	QCC_UNUSED(member);
@@ -394,6 +408,16 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 				}
 			}
 			break;
+			case ACT_SIGNAL:
+			{
+				SYNC_SIGNAL * pSS = (SYNC_SIGNAL *)iter->second.extra;
+
+				if (pSS) MissingCheck(pSS->uid, pSS->sn);
+			}
+			break;
+			case ACT_NO_MISSED:
+				mob_no_missed_db(iter->second.wid, iter->second.body.z);
+				break;
 			}
 			m_mTrain.erase(iter);
 		}

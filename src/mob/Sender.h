@@ -58,6 +58,11 @@ using namespace ajn;
 #define MOB_SERVICE_OBJECT_PATH "/mobService"
 #define MOB_PORT 27
 
+#define TM_MISSING_CHECK	1
+#define TM_SEND_SIGNAL		2
+#define INT_MISSING_CHECK	2000
+#define INT_SEND_SIGNAL		5000
+
 typedef struct {
 	int marks[TRAIN_MARK_END];
 	int aid;  // action id
@@ -157,6 +162,7 @@ public:
 	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
 	void MissingCheck();
+	void MissingCheck(const char * sUID, int nSNum);
 	const char * GetLocalPath(SessionId nSID, const char * pJoiner, const char * sURI);
 	void Save(SessionId nSID, const char * pJoiner, char * sText, int nLength, const char * pExtra, int nExtLen);
 	void OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg);

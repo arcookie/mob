@@ -10,7 +10,8 @@
 #define ACT_FILE		3
 #define ACT_MISSING		4
 #define ACT_SIGNAL		5
-#define ACT_END			6
+#define ACT_NO_MISSED	6
+#define ACT_END			7
 
 #define NAME_PREFIX	"org.alljoyn.bus.arcookie.mob."
 
@@ -70,6 +71,8 @@ extern "C" {
 	void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const char * base, const char * sql);
 	void mob_undo_db(unsigned int sid, const char * uid, int snum, const char * base);
 	int mob_close_db(sqlite3 * pDb);
+	void mob_no_missed_db(unsigned int sid, const char * snum);
+	void mob_signal_db(unsigned int sid);
 	void mob_exit(void);
 	extern int mob_find_parent_db(unsigned int sid, const char * uid, int snum, const char * base);
 	extern int mob_get_db(unsigned int sid, int num, const char * base, SYNC_DATA * pSD);

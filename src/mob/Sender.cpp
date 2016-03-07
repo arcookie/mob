@@ -150,6 +150,13 @@ QStatus CSender::SendData(const char * sJoinName, int nAID, int nAction, Session
 	return status;
 }
 
+void CALLBACK fnSendSignal(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWORD /*dwTime*/)
+{
+	KillTimer(NULL, idEvent);
+
+	mob_signal_db(alljoyn_session_id());
+}
+
 int alljoyn_send(SessionId nSID, const char * pJoiner, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen)
 {
 	time_t aid = time(NULL);
@@ -180,7 +187,10 @@ int alljoyn_send(SessionId nSID, const char * pJoiner, int nAction, char * sText
 			}
 			else p++;
 		}
-		if (data.nUsed > 0) ret = gpMob->SendData(pJoiner, aid, ACT_FLIST, nSID, data.z, data.nUsed);
+		if (data.nUsed > 0) {
+			ret = gpMob->SendData(pJoiner, aid, ACT_FLIST, nSID, data.z, data.nUsed);
+			SetTimer(NULL, TM_SEND_SIGNAL, INT_SEND_SIGNAL, &fnSendSignal);
+		}
 
 		blkFree(&data);
 	}
