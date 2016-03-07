@@ -46,6 +46,8 @@ public:
 
 	virtual QStatus Init(const char * sJoinName);
 
+	void MissingCheck();
+
 	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0) { return m_pSender->SendData(sJoinName, nAID, nAction, wid, msg, nLength, pExtra, nExtLen); }
 
 	const char * GetJoinName() { return m_sJoiner.data(); }

@@ -1,4 +1,3 @@
 
 
 // 2. signal
-// 3. missing check timer

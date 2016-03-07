@@ -32,6 +32,9 @@
 #include "Sender.h"
 #include "AlljoynMob.h"
 
+#define TM_MISSING_CHECK	1
+#define INT_MISSING_CHECK	2000
+
 extern qcc::String gWPath;
 
 struct find_id : std::unary_function<RECEIVE, bool> {
@@ -111,6 +114,13 @@ QStatus CSender::SendFile(const char * sJoinName, int nAID, int nAction, Session
 	return status;
 }
 
+void CALLBACK fnMissingCheck(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWORD /*dwTime*/)
+{
+	KillTimer(NULL, idEvent);
+
+	gpMob->MissingCheck();
+}
+
 void CSender::Save(SessionId nSID, const char * pJoiner, char * sText, int nLength, const char * pExtra, int nExtLen)
 {
 	RECEIVE rcv;
@@ -142,7 +152,10 @@ void CSender::Save(SessionId nSID, const char * pJoiner, char * sText, int nLeng
 
 	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
 		for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
-			if ((*viter).sn_s != (*viter).sn_e && (*viter).sn_e > 1 && std::find_if(miter->second.begin(), miter->second.end(), find_id((*viter).uid, (*viter).sn_e - 1)) == miter->second.end()) return;
+			if ((*viter).sn_s != (*viter).sn_e && (*viter).sn_e > 1 && std::find_if(miter->second.begin(), miter->second.end(), find_id((*viter).uid, (*viter).sn_e - 1)) == miter->second.end()) {
+				SetTimer(NULL, TM_MISSING_CHECK, INT_MISSING_CHECK, &fnMissingCheck);
+				return;
+			}
 		}
 	}
 

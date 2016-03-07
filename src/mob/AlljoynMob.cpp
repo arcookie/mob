@@ -123,6 +123,11 @@ QStatus CAlljoynMob::Init(const char * sJoinName)
 	return status;
 }
 
+void CAlljoynMob::MissingCheck()
+{
+	m_pSender->MissingCheck();
+}
+
 qcc::String GetVirtualStorePath()
 {
 	CHAR buffer[MAX_PATH];
@@ -197,11 +202,6 @@ void alljoyn_disconnect(void)
 	}
 }
 
-static int catmem(char ** data, void * fsi, int len)
-{
-	return 0;
-}
-
 int alljoyn_session_id()
 {
 	return gpMob->GetSessionID();
@@ -216,3 +216,9 @@ const char * get_writable_path()
 {
 	return gWPath.data();
 }
+
+int set_timer(int id, int elapse, TIMERPROC func)
+{
+	return SetTimer(NULL, id, elapse, func);
+}
+
