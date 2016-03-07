@@ -1,5 +1,4 @@
 
 
-// 1. file save problem
 // 2. signal
 // 3. missing check timer

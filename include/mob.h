@@ -45,6 +45,7 @@ extern "C" {
 
 	extern void blkInit(Block *p);
 	extern void blkFree(Block *p);
+	extern const char * get_writable_path();
 	extern int memCat(Block *p, const char * z, int n);
 	extern int strPrintf(Block *p, const char *zFormat, ...);
 	sqlite3_stmt *db_prepare(sqlite3 * pDB, const char *zFormat, ...);

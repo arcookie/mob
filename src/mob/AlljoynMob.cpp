@@ -25,12 +25,15 @@
 */
 
 #include <time.h>
+#include <ShlObj.h>
 #include <alljoyn/Init.h>
 #include "mob.h"
 #include "MobClient.h"
 #include "MobServer.h"
 #include "MobBusListener.h"
 
+qcc::String gWPath;
+HANDLE gMutex = NULL;
 CAlljoynMob * gpMob = NULL;
 
 CAlljoynMob::CAlljoynMob() 
@@ -120,15 +123,52 @@ QStatus CAlljoynMob::Init(const char * sJoinName)
 	return status;
 }
 
-char * get_file_path(const char * path)
+qcc::String GetVirtualStorePath()
 {
-	return 0;
+	CHAR buffer[MAX_PATH];
+
+	SHGetSpecialFolderPath(NULL, buffer, CSIDL_LOCAL_APPDATA, 0);
+
+	return qcc::String(buffer) + "\\mob\\";
+}
+
+void remove_dir(qcc::String wFile)
+{
+	HANDLE				hFile;
+	WIN32_FIND_DATA		nFileSizeLow;
+	qcc::String			sFile;
+
+	if ((hFile = FindFirstFile((wFile + "*.*").data(), &nFileSizeLow)) != INVALID_HANDLE_VALUE){
+		do {
+			sFile = nFileSizeLow.cFileName;
+			if (!sFile.empty() && sFile != "." && sFile != ".."){
+				sFile = wFile + sFile;
+				if (nFileSizeLow.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY){
+					remove_dir(sFile + "\\");
+					RemoveDirectory(sFile.data());
+				}
+				else {
+					SetFileAttributes(sFile.data(), FILE_ATTRIBUTE_NORMAL);
+					DeleteFile(sFile.data());
+				}
+			}
+		} while (FindNextFile(hFile, &nFileSizeLow));
+
+		FindClose(hFile);
+	}
 }
 
 /** Take input from stdin and send it as a mob message, continue until an error or
 * SIGINT occurs, return the result status. */
 int alljoyn_connect(const char * advertisedName, const char * joinName)
 {
+	gWPath = GetVirtualStorePath();
+
+	CreateDirectory(gWPath.data(), FALSE);
+
+	gMutex = CreateMutex(NULL, TRUE, "PreverntSecondInstanceOfMob");
+	if (GetLastError() != ERROR_ALREADY_EXISTS) remove_dir(gWPath);
+
 	if (advertisedName) {
 		gpMob = new CMobServer();
 		return gpMob->Init(advertisedName);
@@ -150,6 +190,11 @@ void alljoyn_disconnect(void)
 	AllJoynRouterShutdown();
 #endif
 	AllJoynShutdown();
+
+	if (gMutex) {
+		ReleaseMutex(gMutex);
+		CloseHandle(gMutex);
+	}
 }
 
 static int catmem(char ** data, void * fsi, int len)
@@ -165,4 +210,9 @@ int alljoyn_session_id()
 const char * alljoyn_join_name()
 {
 	return gpMob->GetJoinName();
+}
+
+const char * get_writable_path()
+{
+	return gWPath.data();
 }

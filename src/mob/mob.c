@@ -48,7 +48,7 @@ static int _create_db(long id, const char * mark, sqlite3 **ppDb)
 
 	blkInit(&fname);
 
-	strPrintf(&fname, "%ld_%s.db3", id, mark);
+	strPrintf(&fname, "%s%ld_%s.db3", get_writable_path(), id, mark);
 
 	_unlink(fname.z);
 
@@ -66,7 +66,7 @@ static int _close_db(long id, const char * mark, sqlite3 *pDb)
 
 	blkInit(&fname);
 
-	strPrintf(&fname, "%ld_%s.db3", id, mark);
+	strPrintf(&fname, "%s%ld_%s.db3", get_writable_path(), id, mark);
 
 	_unlink(fname.z);
 

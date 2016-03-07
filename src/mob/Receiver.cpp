@@ -32,6 +32,7 @@
 #include "Sender.h"
 #include "AlljoynMob.h"
 
+extern qcc::String gWPath;
 
 struct find_id : std::unary_function<RECEIVE, bool> {
 	int snum;
@@ -261,6 +262,24 @@ const char * CSender::GetLocalPath(SessionId nSID, const char * pJoiner, const c
 	else return NULL;
 }
 
+const qcc::String mem2tmpfile(const char * data, int length, const qcc::String ext)
+{
+	FILE *fp;
+	qcc::String sPath;
+	static ULONGLONG ullCount = 0;
+
+	do {
+		sPath = gWPath + qcc::I32ToString(++ullCount) + ext;
+	} while (GetFileAttributes(sPath.data()) != INVALID_FILE_ATTRIBUTES);
+
+	if ((fp = fopen(sPath.data(), "wb")) != NULL) {
+		fwrite(data, sizeof(char), length, fp);
+		fclose(fp);
+		return sPath;
+	}
+	return "";
+}
+
 void CSender::OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg)
 {
 	QCC_UNUSED(member);
@@ -346,8 +365,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 					fri.uri = pFSI->uri;
 					fri.uid = msg->GetSender();
 					fri.wid = iter->second.wid;
-
-					// fri.path save
+					fri.path = mem2tmpfile(iter->second.body.z, iter->second.body.nUsed, fri.uri.substr(fri.uri.find_last_of('.')));
 
 					gRecvFiles.push_back(fri);
 				}
