@@ -4560,13 +4560,67 @@ static void printBold(const char *zText){
 }
 #endif
 
+static void usage()
+{
+	printf("Usage: mob [-h] [-s <name>] | [-j <name>]\n");
+	exit(EXIT_FAILURE);
+}
+
+static int alljoyn_init(int argc, char** argv)
+{
+	char * joinName = 0;
+	char * advertisedName = 0;
+
+	/* Parse command line args */
+	for (int i = 1; i < argc; ++i) {
+		if (0 == strcmp("-s", argv[i])) {
+			if ((++i < argc) && (argv[i][0] != '-')) {
+				advertisedName = sqlite3_mprintf("%s%s", NAME_PREFIX, argv[i]);
+			}
+			else {
+				printf("Missing parameter for \"-s\" option\n");
+				usage();
+			}
+		}
+		else if (0 == strcmp("-j", argv[i])) {
+			if ((++i < argc) && (argv[i][0] != '-')) {
+				joinName = sqlite3_mprintf("%s%s", NAME_PREFIX, argv[i]);
+			}
+			else {
+				printf("Missing parameter for \"-j\" option\n");
+				usage();
+			}
+		}
+		else {
+			if (0 != strcmp("-h", argv[i])) printf("Unknown argument \"%s\"\n", argv[i]);
+			usage();
+		}
+	}
+	/* Validate command line */
+	if (advertisedName && joinName) {
+		printf("Must specify either -s or -j\n");
+		usage();
+	}
+	else if (!advertisedName && !joinName) {
+		printf("Cannot specify both -s  and -j\n");
+		usage();
+	}
+
+	int ret = alljoyn_connect(advertisedName, joinName);
+
+	if (advertisedName) sqlite3_free(advertisedName);
+	if (joinName) sqlite3_free(joinName);
+
+	return ret;
+}
+
 int SQLITE_CDECL main(int argc, char **argv){
   ShellState data;
   const char *zInitFile = 0;
   int rc = 0;
   int warnInmemoryDb = 0;
 
-  if (mob_init(argc, argv)) {
+  if (alljoyn_init(argc, argv)) {
 	  utf8_printf(stderr, "Error occured in mob_init().\n");
 	  exit(1);
   }
@@ -4671,7 +4725,7 @@ int SQLITE_CDECL main(int argc, char **argv){
   }
   sqlite3_free(data.zFreeOnClose); 
 
-  mob_exit();
+  alljoyn_disconnect();
 
   return rc;
 }

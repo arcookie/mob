@@ -36,12 +36,6 @@ sqlite3 * master_db = 0;           /* The database */
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // static functions
 
-static void usage()
-{
-	printf("Usage: mob [-h] [-s <name>] | [-j <name>]\n");
-	exit(EXIT_FAILURE);
-}
-
 static int _create_db(long id, const char * mark, sqlite3 **ppDb)
 {
 	Block fname;
@@ -98,59 +92,6 @@ void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const ch
 	);
 
 	blkFree(&undo);
-}
-
-int mob_init(int argc, char** argv)
-{
-	char * joinName = 0;
-	char * advertisedName = 0;
-
-	/* Parse command line args */
-	for (int i = 1; i < argc; ++i) {
-		if (0 == strcmp("-s", argv[i])) {
-			if ((++i < argc) && (argv[i][0] != '-')) {
-				advertisedName = sqlite3_mprintf("%s%s", NAME_PREFIX, argv[i]);
-			}
-			else {
-				printf("Missing parameter for \"-s\" option\n");
-				usage();
-			}
-		}
-		else if (0 == strcmp("-j", argv[i])) {
-			if ((++i < argc) && (argv[i][0] != '-')) {
-				joinName = sqlite3_mprintf("%s%s", NAME_PREFIX, argv[i]);
-			}
-			else {
-				printf("Missing parameter for \"-j\" option\n");
-				usage();
-			}
-		}
-		else {
-			if (0 != strcmp("-h", argv[i])) printf("Unknown argument \"%s\"\n", argv[i]);
-			usage();
-		}
-	}
-	/* Validate command line */
-	if (advertisedName && joinName) {
-		printf("Must specify either -s or -j\n");
-		usage();
-	}
-	else if (!advertisedName && !joinName) {
-		printf("Cannot specify both -s  and -j\n");
-		usage();
-	}
-
-	int ret = alljoyn_connect(advertisedName, joinName);
-
-	if (advertisedName) sqlite3_free(advertisedName);
-	if (joinName) sqlite3_free(joinName);
-
-	return ret;
-}
-
-void mob_exit(void)
-{
-	alljoyn_disconnect();
 }
 
 int mob_open_db(const char *zFilename, sqlite3 **ppDb)

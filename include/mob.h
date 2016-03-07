@@ -65,7 +65,6 @@ extern "C" {
 
 	/* mob functions */
 
-	int mob_init(int argc, char** argv);
 	int mob_open_db(const char *zFilename, sqlite3 **ppDb);
 	int mob_sync_db(sqlite3 * pDb);
 	void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const char * base, const char * sql);
@@ -73,7 +72,6 @@ extern "C" {
 	int mob_close_db(sqlite3 * pDb);
 	void mob_no_missed_db(unsigned int sid, const char * snum);
 	void mob_signal_db(unsigned int sid);
-	void mob_exit(void);
 	extern int mob_find_parent_db(unsigned int sid, const char * uid, int snum, const char * base);
 	extern int mob_get_db(unsigned int sid, int num, const char * base, SYNC_DATA * pSD);
 

@@ -272,7 +272,7 @@ const char * CSender::GetLocalPath(SessionId nSID, const char * pJoiner, const c
 	else return NULL;
 }
 
-const qcc::String mem2tmpfile(const char * data, int length, const qcc::String ext)
+const qcc::String mem2file(const char * data, int length, const qcc::String ext)
 {
 	FILE *fp;
 	qcc::String sPath;
@@ -392,7 +392,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 					fri.uri = pFSI->uri;
 					fri.uid = msg->GetSender();
 					fri.wid = iter->second.wid;
-					fri.path = mem2tmpfile(iter->second.body.z, iter->second.body.nUsed, fri.uri.substr(fri.uri.find_last_of('.')));
+					fri.path = mem2file(iter->second.body.z, iter->second.body.nUsed, fri.uri.substr(fri.uri.find_last_of('.')));
 
 					gRecvFiles.push_back(fri);
 				}
