@@ -55,12 +55,7 @@ CAlljoynMob::~CAlljoynMob()
 		delete m_pBus;
 		m_pBus = NULL;
 	}
-	if (m_pMainDB) {
-		sqlite3_exec(m_pMainDB, "DETACH aux;", 0, 0, 0);
-		sqlite3_close(m_pMainDB);
-	}
-	if (m_pBackDB) sqlite3_close(m_pBackDB);
-	if (m_pUndoDB) sqlite3_close(m_pUndoDB);
+	CloseDB();
 }
 
 void CAlljoynMob::CloseDB()
@@ -172,11 +167,6 @@ QStatus CAlljoynMob::Init(const char * sJoinName)
 	return status;
 }
 
-void CAlljoynMob::MissingCheck()
-{
-	m_pSender->MissingCheck();
-}
-
 qcc::String GetVirtualStorePath()
 {
 	CHAR buffer[MAX_PATH];
@@ -249,11 +239,6 @@ void alljoyn_disconnect(void)
 		ReleaseMutex(gMutex);
 		CloseHandle(gMutex);
 	}
-}
-
-int set_timer(int id, int elapse, TIMERPROC func)
-{
-	return SetTimer(NULL, id, elapse, func);
 }
 
 sqlite3 * alljoyn_open_db(const char *zFilename)

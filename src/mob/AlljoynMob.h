@@ -47,27 +47,26 @@ public:
 	virtual QStatus Init(const char * sJoinName);
 
 	void CloseDB();
-	void MissingCheck();
 	sqlite3 * OpenDB(const char *zFilename);
 
-	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0) { return m_pSender->SendData(sJoinName, nAID, nAction, wid, msg, nLength, pExtra, nExtLen); }
+	sqlite3 * GetMainDB() { return m_pMainDB; }
+	sqlite3 * GetBackDB() { return m_pBackDB; }
+	sqlite3 * GetUndoDB() { return m_pUndoDB; }
 
-	const char * GetJoinName() { return m_sJoiner.data(); }
-	void SetJoinName(const char * name) { m_sJoiner = name; }
-
+	int GetSerial() { return m_nSerial; }
+	void MissingCheck()	{ m_pSender->MissingCheck(); }
 	SessionId GetSessionID() { return m_nSessionID; }
 	void SetSessionID(SessionId id) { m_nSessionID = id; }
-	int GetSerial() { return m_nSerial; }
-
+	const char * GetJoinName() { return m_sJoiner.data(); }
+	void SetJoinName(const char * name) { m_sJoiner = name; }
 	void EnableConcurrentCallbacks() { m_pBus->EnableConcurrentCallbacks(); }
 	QStatus JoinSession(const char* sessionHost, SessionPort sessionPort, SessionListener* listener, SessionId& sessionId, SessionOpts& opts) {
 		return m_pBus->JoinSession(sessionHost, sessionPort, listener, sessionId, opts);
 	}
 	QStatus SetLinkTimeout(SessionId sessionid, uint32_t& linkTimeout) { return m_pBus->SetLinkTimeout(sessionid, linkTimeout); }
-
-	sqlite3 * GetMainDB() { return m_pMainDB; }
-	sqlite3 * GetBackDB() { return m_pBackDB; }
-	sqlite3 * GetUndoDB() { return m_pUndoDB; }
+	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0) { 
+		return m_pSender->SendData(sJoinName, nAID, nAction, wid, msg, nLength, pExtra, nExtLen); 
+	}
 
 protected:
 	ajn::BusAttachment *	m_pBus;

@@ -88,6 +88,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\mob\AlljoynMob.cpp" />
+    <ClCompile Include="..\src\mob\Global.cpp" />
     <ClCompile Include="..\src\mob\MobBusListener.cpp" />
     <ClCompile Include="..\src\mob\MobClient.cpp" />
     <ClCompile Include="..\src\mob\MobServer.cpp" />
@@ -97,6 +98,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\mob\AlljoynMob.h" />
+    <ClInclude Include="..\src\mob\Global.h" />
     <ClInclude Include="..\src\mob\MobBusListener.h" />
     <ClInclude Include="..\src\mob\MobClient.h" />
     <ClInclude Include="..\src\mob\MobServer.h" />

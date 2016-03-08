@@ -62,20 +62,20 @@ extern "C" {
 	extern void blkFree(Block *p);
 	extern int memCat(Block *p, const char * z, int n);
 	extern int strPrintf(Block *p, const char *zFormat, ...);
-	sqlite3_stmt *db_prepare(sqlite3 * pDB, const char *zFormat, ...);
-	void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab, Block *out);
+	extern sqlite3_stmt *db_prepare(sqlite3 * pDB, const char *zFormat, ...);
+	extern void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab, Block *out);
 
 	/* alljoyn related functions */
-	sqlite3 * alljoyn_open_db(const char *zFilename);
-	void alljoyn_close_db(sqlite3 * pDb);
+	extern sqlite3 * alljoyn_open_db(const char *zFilename);
+	extern void alljoyn_close_db(sqlite3 * pDb);
 
-	void alljoyn_disconnect(void);
-	int alljoyn_connect(const char * advertisedName, const char * joinName);
+	extern void alljoyn_disconnect(void);
+	extern int alljoyn_connect(const char * advertisedName, const char * joinName);
 
-	int alljoyn_send(unsigned int nSID, const char * pJoiner, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen);
+	extern int alljoyn_send(unsigned int nSID, const char * pJoiner, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen);
 
 	/* mob functions */
-	int mob_sync_db(sqlite3 * pDb);
+	extern int mob_sync_db(sqlite3 * pDb);
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */
