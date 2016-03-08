@@ -39,8 +39,12 @@ CAlljoynMob * gpMob = NULL;
 CAlljoynMob::CAlljoynMob() 
 {
 	m_pBus = NULL;
+	m_nSerial = 0;
 	m_pSender = NULL;
 	m_nSessionID = 0;
+	m_pMainDB = NULL;
+	m_pBackDB = NULL;
+	m_pUndoDB = NULL;
 }
 
 CAlljoynMob::~CAlljoynMob() 
@@ -49,6 +53,9 @@ CAlljoynMob::~CAlljoynMob()
 		delete m_pBus;
 		m_pBus = NULL;
 	}
+	if (m_pMainDB) sqlite3_close(m_pMainDB);
+	if (m_pBackDB) sqlite3_close(m_pBackDB);
+	if (m_pUndoDB) sqlite3_close(m_pUndoDB);
 }
 
 QStatus CAlljoynMob::Init(const char * sJoinName)

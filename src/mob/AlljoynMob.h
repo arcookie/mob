@@ -64,10 +64,15 @@ public:
 
 protected:
 	ajn::BusAttachment *	m_pBus;
+	int						m_nSerial;
 	CSender*				m_pSender;
 	qcc::String				m_sJoiner;
 	SessionId				m_nSessionID;
 	MobBusListener			m_BusListener;
+
+	sqlite3 *				m_pMainDB;
+	sqlite3 *				m_pBackDB;
+	sqlite3 *				m_pUndoDB;
 };
 
 extern CAlljoynMob * gpMob;
