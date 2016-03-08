@@ -15,87 +15,75 @@
 #include "mob.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// defines
-
-#define QUERY_SQL(__db__, __stmt__, __sql__, ...)	\
-	if (sqlite3_prepare_v2(__db__, __sql__, -1, &__stmt__, NULL) == SQLITE_OK) {\
-while (sqlite3_step(__stmt__) == SQLITE_ROW) { __VA_ARGS__ } sqlite3_finalize(__stmt__); __stmt__ = NULL;}
-
-#define QUERY_SQL_V(__db__, __stmt__, __sql__, ...)	\
-	{ char * __zSQL__ = sqlite3_mprintf __sql__; if (__zSQL__ && sqlite3_prepare_v2(__db__, __zSQL__, -1, &__stmt__, NULL) == SQLITE_OK) {\
-	while (sqlite3_step(__stmt__) == SQLITE_ROW) { __VA_ARGS__ } sqlite3_finalize(__stmt__); __stmt__ = NULL;}	sqlite3_free(__zSQL__);	}
-
-#define EXECUTE_SQL_V(__db__, __sql__, ...)	\
-	{ char * __zSQL__ = sqlite3_mprintf __sql__; if (__zSQL__) { sqlite3_exec(__db__, __zSQL__, 0, 0, 0); sqlite3_free(__zSQL__); }}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // static variables
 
 sqlite3 * master_db = 0;           /* The database */
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // static functions
-
-static int _create_db(long id, const char * mark, sqlite3 **ppDb)
-{
-	Block fname;
-
-	blkInit(&fname);
-
-	strPrintf(&fname, "%s%ld_%s.db3", get_writable_path(), id, mark);
-
-	_unlink(fname.z);
-
-	int rc = sqlite3_open(fname.z, ppDb);
-
-	blkFree(&fname);
-
-	return rc;
-}
-
-static int _close_db(long id, const char * mark, sqlite3 *pDb)
-{
-	Block fname;
-	int rc = sqlite3_close(pDb);
-
-	blkInit(&fname);
-
-	strPrintf(&fname, "%s%ld_%s.db3", get_writable_path(), id, mark);
-
-	_unlink(fname.z);
-
-	blkFree(&fname);
-
-	return rc;
-}
+//
+//static int _create_db(long id, const char * mark, sqlite3 **ppDb)
+//{
+//	Block fname;
+//
+//	blkInit(&fname);
+//
+//	strPrintf(&fname, "%s%ld_%s.db3", get_writable_path(), id, mark);
+//
+//	_unlink(fname.z);
+//
+//	int rc = sqlite3_open(fname.z, ppDb);
+//
+//	blkFree(&fname);
+//
+//	return rc;
+//}
+//
+//static int _close_db(long id, const char * mark, sqlite3 *pDb)
+//{
+//	Block fname;
+//	int rc = sqlite3_close(pDb);
+//
+//	blkInit(&fname);
+//
+//	strPrintf(&fname, "%s%ld_%s.db3", get_writable_path(), id, mark);
+//
+//	_unlink(fname.z);
+//
+//	blkFree(&fname);
+//
+//	return rc;
+//}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // global functions
-
-void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const char * base, const char * sql)
-{
-	Block undo;
-	sqlite3_stmt *pStmt = NULL;
-
-	blkInit(&undo);
-
-	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, ptr_back, ptr_undo FROM works WHERE num=%d", sid),
-		sqlite3 * pDB = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
-		sqlite3 * pBackDB = (sqlite3 *)sqlite3_column_int64(pStmt, 1);
-		sqlite3 * pUndoDB = (sqlite3 *)sqlite3_column_int64(pStmt, 2);
-
-		sqlite3_exec(pDB, sql, 0, 0, 0);
-		diff_one_table(pDB, "main", "aux", base, &undo);
-		sqlite3_exec(pBackDB, sql, 0, 0, 0);
-		EXECUTE_SQL_V(pUndoDB, ("INSERT INTO works (uid, sn, snum, base, undo, redo) VALUES (%Q, %d, %d, %Q, %Q, %Q);", uid, sn, snum, base, undo.z, sql));
-		break;
-	);
-
-	blkFree(&undo);
-}
+//
+//void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const char * base, const char * sql)
+//{
+//	Block undo;
+//	sqlite3_stmt *pStmt = NULL;
+//
+//	blkInit(&undo);
+//
+//	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, ptr_back, ptr_undo FROM works WHERE num=%d", sid),
+//		sqlite3 * pDB = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
+//		sqlite3 * pBackDB = (sqlite3 *)sqlite3_column_int64(pStmt, 1);
+//		sqlite3 * pUndoDB = (sqlite3 *)sqlite3_column_int64(pStmt, 2);
+//
+//		sqlite3_exec(pDB, sql, 0, 0, 0);
+//		diff_one_table(pDB, "main", "aux", base, &undo);
+//		sqlite3_exec(pBackDB, sql, 0, 0, 0);
+//		EXECUTE_SQL_V(pUndoDB, ("INSERT INTO works (uid, sn, snum, base, undo, redo) VALUES (%Q, %d, %d, %Q, %Q, %Q);", uid, sn, snum, base, undo.z, sql));
+//		break;
+//	);
+//
+//	blkFree(&undo);
+//}
 
 int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 {
+	*ppDb = alljoyn_open_db(zFilename);
+	/*
 	if (!master_db && sqlite3_open(":memory:", &master_db) == SQLITE_OK)
 		sqlite3_exec(master_db, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid CHAR(16), sn INT DEFAULT 0, ptr_main BIGINT, ptr_back BIGINT, ptr_undo BIGINT); PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 	else {
@@ -124,59 +112,59 @@ int mob_open_db(const char *zFilename, sqlite3 **ppDb)
 		}
 
 		return nRet;
-	}
+	}*/
 	return SQLITE_ERROR;
 }
-
-void mob_undo_db(unsigned int sid, const char * uid, int snum, const char * base)
-{
-	sqlite3_stmt *pStmt = NULL;
-	sqlite3_stmt *pStmt2 = NULL;
-	sqlite3_stmt *pStmt3 = NULL;
-
-	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, ptr_undo FROM works WHERE num=%d", sid),
-		sqlite3 * pDB = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
-		sqlite3 * pDBUndo = (sqlite3 *)sqlite3_column_int64(pStmt, 1);
-
-		QUERY_SQL_V(pDBUndo, pStmt2, ("SELECT num FROM works WHERE uid=%Q AND snum=%d AND base=%Q", uid, snum, base),
-			int num = sqlite3_column_int(pStmt2, 0);
-
-			QUERY_SQL_V(pDBUndo, pStmt3, ("SELECT undo FROM works WHERE num > %d AND base=%Q ORDER BY num DESC", num, base),
-				sqlite3_exec(pDB, sqlite3_column_text(pStmt3, 0), 0, 0, 0);
-			);
-			EXECUTE_SQL_V(pDB, ("DELETE FROM works WHERE num > %d AND base=%Q;REINDEX works;", num, base));
-			break;
-		);
-		break;
-	);
-}
-
-void mob_send_missed_db(unsigned int sid, const char * pJoiner, const char * having)
-{
-	sqlite3_stmt *pStmt = NULL;
-	sqlite3_stmt *pStmt2 = NULL;
-	sqlite3_stmt *pStmt3 = NULL;
-	SYNC_DATA sd;
-
-	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_undo, uid FROM works WHERE num=%d", sid),
-		sqlite3 * pDBUndo = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
-
-		strcpy_s(sd.uid, sizeof(sd.uid), sqlite3_column_text(pStmt, 1));
-
-		QUERY_SQL_V(pDBUndo, pStmt2, ("SELECT num, sn, snum, base, undo FROM works WHERE uid=%Q AND sn IN (%s)", sd.uid, having),
-			sd.sn = sqlite3_column_int(pStmt2, 1);
-			sd.snum = sqlite3_column_int(pStmt2, 2);
-			strcpy_s(sd.base, sizeof(sd.base), sqlite3_column_text(pStmt2, 3));
-			QUERY_SQL_V(pDBUndo, pStmt3, ("SELECT uid, snum FROM works WHERE num > %d AND base=%Q ORDER BY num DESC LIMIT 1", sqlite3_column_int(pStmt2, 0), sd.base),
-				strcpy_s(sd.uid_p, sizeof(sd.uid_p), sqlite3_column_text(pStmt3, 0));
-				sd.snum_p = sqlite3_column_int(pStmt3, 1);
-				alljoyn_send(sid, pJoiner, ACT_DATA, sqlite3_column_text(pStmt2, 4), sqlite3_column_bytes(pStmt2, 4), (const char *)&sd, sizeof(SYNC_DATA));
-				break;
-			);
-		);
-		break;
-	);
-}
+//
+//void mob_undo_db(unsigned int sid, const char * uid, int snum, const char * base)
+//{
+//	sqlite3_stmt *pStmt = NULL;
+//	sqlite3_stmt *pStmt2 = NULL;
+//	sqlite3_stmt *pStmt3 = NULL;
+//
+//	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, ptr_undo FROM works WHERE num=%d", sid),
+//		sqlite3 * pDB = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
+//		sqlite3 * pDBUndo = (sqlite3 *)sqlite3_column_int64(pStmt, 1);
+//
+//		QUERY_SQL_V(pDBUndo, pStmt2, ("SELECT num FROM works WHERE uid=%Q AND snum=%d AND base=%Q", uid, snum, base),
+//			int num = sqlite3_column_int(pStmt2, 0);
+//
+//			QUERY_SQL_V(pDBUndo, pStmt3, ("SELECT undo FROM works WHERE num > %d AND base=%Q ORDER BY num DESC", num, base),
+//				sqlite3_exec(pDB, sqlite3_column_text(pStmt3, 0), 0, 0, 0);
+//			);
+//			EXECUTE_SQL_V(pDB, ("DELETE FROM works WHERE num > %d AND base=%Q;REINDEX works;", num, base));
+//			break;
+//		);
+//		break;
+//	);
+//}
+//
+//void mob_send_missed_db(unsigned int sid, const char * pJoiner, const char * having)
+//{
+//	sqlite3_stmt *pStmt = NULL;
+//	sqlite3_stmt *pStmt2 = NULL;
+//	sqlite3_stmt *pStmt3 = NULL;
+//	SYNC_DATA sd;
+//
+//	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_undo, uid FROM works WHERE num=%d", sid),
+//		sqlite3 * pDBUndo = (sqlite3 *)sqlite3_column_int64(pStmt, 0);
+//
+//		strcpy_s(sd.uid, sizeof(sd.uid), sqlite3_column_text(pStmt, 1));
+//
+//		QUERY_SQL_V(pDBUndo, pStmt2, ("SELECT num, sn, snum, base, undo FROM works WHERE uid=%Q AND sn IN (%s)", sd.uid, having),
+//			sd.sn = sqlite3_column_int(pStmt2, 1);
+//			sd.snum = sqlite3_column_int(pStmt2, 2);
+//			strcpy_s(sd.base, sizeof(sd.base), sqlite3_column_text(pStmt2, 3));
+//			QUERY_SQL_V(pDBUndo, pStmt3, ("SELECT uid, snum FROM works WHERE num > %d AND base=%Q ORDER BY num DESC LIMIT 1", sqlite3_column_int(pStmt2, 0), sd.base),
+//				strcpy_s(sd.uid_p, sizeof(sd.uid_p), sqlite3_column_text(pStmt3, 0));
+//				sd.snum_p = sqlite3_column_int(pStmt3, 1);
+//				alljoyn_send(sid, pJoiner, ACT_DATA, sqlite3_column_text(pStmt2, 4), sqlite3_column_bytes(pStmt2, 4), (const char *)&sd, sizeof(SYNC_DATA));
+//				break;
+//			);
+//		);
+//		break;
+//	);
+//}
 
 int mob_sync_db(sqlite3 * pDb)
 {
@@ -236,32 +224,34 @@ int mob_sync_db(sqlite3 * pDb)
 
 	return 0;
 }
+//
+//void mob_no_missed_db(unsigned int sid, const char * snum)
+//{
+//	EXECUTE_SQL_V(master_db, ("UPDATE works SET sn=%s WHERE num=%d;", snum, sid));
+//}
+//
+//void mob_signal_db(unsigned int sid)
+//{
+//	SYNC_SIGNAL ss;
+//	sqlite3_stmt *pStmt = NULL;
+//	sqlite3_stmt *pStmt2 = NULL;
+//
+//	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, uid, sn FROM works WHERE num=%d", sid),
+//		strcpy_s(ss.uid, sizeof(ss.uid), sqlite3_column_text(pStmt, 1));
+//		QUERY_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 0), pStmt2, ("SELECT MAX(sn) AS n FROM works WHERE uid = %Q;", ss.uid),
+//			ss.sn = sqlite3_column_int(pStmt2, 0);
+//
+//			if (ss.sn != sqlite3_column_int(pStmt, 0)) alljoyn_send(sid, NULL, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+//			break;
+//		);
+//		break;
+//	);
+//}
 
-void mob_no_missed_db(unsigned int sid, const char * snum)
-{
-	EXECUTE_SQL_V(master_db, ("UPDATE works SET sn=%s WHERE num=%d;", snum, sid));
-}
-
-void mob_signal_db(unsigned int sid)
-{
-	SYNC_SIGNAL ss;
-	sqlite3_stmt *pStmt = NULL;
-	sqlite3_stmt *pStmt2 = NULL;
-
-	QUERY_SQL_V(master_db, pStmt, ("SELECT ptr_main, uid, sn FROM works WHERE num=%d", sid),
-		strcpy_s(ss.uid, sizeof(ss.uid), sqlite3_column_text(pStmt, 1));
-		QUERY_SQL_V((sqlite3 *)sqlite3_column_int64(pStmt, 0), pStmt2, ("SELECT MAX(sn) AS n FROM works WHERE uid = %Q;", ss.uid),
-			ss.sn = sqlite3_column_int(pStmt2, 0);
-
-			if (ss.sn != sqlite3_column_int(pStmt, 0)) alljoyn_send(sid, NULL, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
-			break;
-		);
-		break;
-	);
-}
-
-int mob_close_db(sqlite3 * pDb)
-{
+//int mob_close_db(sqlite3 * pDb)
+//{
+//	alljoyn_close_db(pDb);
+	/*
 	if (master_db) {
 		sqlite3_stmt *pStmt = NULL;
 
@@ -287,8 +277,8 @@ int mob_close_db(sqlite3 * pDb)
 		}
 	}
 
-	return sqlite3_close(pDb);
-}
+	return sqlite3_close(pDb);*/
+//}
 
 int mob_find_parent_db(unsigned int sid, const char * uid, int snum, const char * base)
 {

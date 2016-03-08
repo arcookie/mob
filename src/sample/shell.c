@@ -3464,7 +3464,7 @@ static int do_meta_command(char *zLine, ShellState *p){
     p->zDbFilename = zNewFilename;
     open_db(p, 1);
     if( p->db!=0 ){
-      mob_close_db(savedDb);
+		alljoyn_close_db(savedDb);
       sqlite3_free(p->zFreeOnClose);
       p->zFreeOnClose = zNewFilename;
     }else{
@@ -4721,7 +4721,7 @@ int SQLITE_CDECL main(int argc, char **argv){
 
   set_table_name(&data, 0);
   if( data.db ){
-    mob_close_db(data.db);
+	  alljoyn_close_db(data.db);
   }
   sqlite3_free(data.zFreeOnClose); 
 

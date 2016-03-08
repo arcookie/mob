@@ -36,6 +36,8 @@ qcc::String gWPath;
 HANDLE gMutex = NULL;
 CAlljoynMob * gpMob = NULL;
 
+extern const qcc::String get_unique_path(const char * ext);
+
 CAlljoynMob::CAlljoynMob() 
 {
 	m_pBus = NULL;
@@ -53,9 +55,49 @@ CAlljoynMob::~CAlljoynMob()
 		delete m_pBus;
 		m_pBus = NULL;
 	}
-	if (m_pMainDB) sqlite3_close(m_pMainDB);
+	if (m_pMainDB) {
+		sqlite3_exec(m_pMainDB, "DETACH aux;", 0, 0, 0);
+		sqlite3_close(m_pMainDB);
+	}
 	if (m_pBackDB) sqlite3_close(m_pBackDB);
 	if (m_pUndoDB) sqlite3_close(m_pUndoDB);
+}
+
+void CAlljoynMob::CloseDB()
+{
+	if (m_pMainDB) {
+		sqlite3_exec(m_pMainDB, "DETACH aux;", 0, 0, 0);
+		sqlite3_close(m_pMainDB);
+		m_pMainDB = NULL;
+	}
+	if (m_pBackDB) {
+		sqlite3_close(m_pBackDB);
+		m_pBackDB = NULL;
+	}
+	if (m_pUndoDB) {
+		sqlite3_close(m_pUndoDB);
+		m_pUndoDB = NULL;
+	}
+}
+
+sqlite3 * CAlljoynMob::OpenDB(const char *zFilename)
+{
+	CloseDB();
+
+	if (sqlite3_open(zFilename, &m_pMainDB) == SQLITE_OK) {
+		qcc::String b_path = get_unique_path(".db3");
+
+		if (sqlite3_open(b_path.data(), &m_pBackDB)) {
+			sqlite3_exec(m_pBackDB, "PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+			EXECUTE_SQL_V(m_pMainDB, ("PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;ATTACH %Q as aux;", b_path.data()));
+		}
+		if (sqlite3_open(get_unique_path(".db3").data(), &m_pUndoDB))
+			sqlite3_exec(m_pUndoDB, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid CHAR(16), sn INT DEFAULT 1, snum INT DEFAULT 1, base VARCHAR(64), undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+
+		return m_pMainDB;
+	}
+
+	return NULL;
 }
 
 QStatus CAlljoynMob::Init(const char * sJoinName)
@@ -229,3 +271,12 @@ int set_timer(int id, int elapse, TIMERPROC func)
 	return SetTimer(NULL, id, elapse, func);
 }
 
+sqlite3 * alljoyn_open_db(const char *zFilename)
+{
+	return gpMob->OpenDB(zFilename);
+}
+
+void alljoyn_close_db(sqlite3 * pDb)
+{
+	gpMob->CloseDB();
+}

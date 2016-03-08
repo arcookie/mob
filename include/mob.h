@@ -15,6 +15,20 @@
 
 #define NAME_PREFIX	"org.alljoyn.bus.arcookie.mob."
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// defines
+
+#define QUERY_SQL(__db__, __stmt__, __sql__, ...)	\
+if (sqlite3_prepare_v2(__db__, __sql__, -1, &__stmt__, NULL) == SQLITE_OK) {\
+while (sqlite3_step(__stmt__) == SQLITE_ROW) { __VA_ARGS__ } sqlite3_finalize(__stmt__); __stmt__ = NULL; }
+
+#define QUERY_SQL_V(__db__, __stmt__, __sql__, ...)	\
+	{ char * __zSQL__ = sqlite3_mprintf __sql__; if (__zSQL__ && sqlite3_prepare_v2(__db__, __zSQL__, -1, &__stmt__, NULL) == SQLITE_OK) {\
+while (sqlite3_step(__stmt__) == SQLITE_ROW) { __VA_ARGS__ } sqlite3_finalize(__stmt__); __stmt__ = NULL; }	sqlite3_free(__zSQL__);	}
+
+#define EXECUTE_SQL_V(__db__, __sql__, ...)	\
+	{ char * __zSQL__ = sqlite3_mprintf __sql__; if (__zSQL__) { sqlite3_exec(__db__, __zSQL__, 0, 0, 0); sqlite3_free(__zSQL__); }}
+
 /*
 ** Make sure we can call this stuff from C++.
 */
@@ -54,11 +68,14 @@ extern "C" {
 
 	/* alljoyn related functions */
 
+	sqlite3 * alljoyn_open_db(const char *zFilename);
+	void alljoyn_close_db(sqlite3 * pDb);
+
 	void alljoyn_disconnect(void);
 	int alljoyn_connect(const char * advertisedName, const char * joinName);
 
 	int alljoyn_send(unsigned int nSID, const char * pJoiner, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen);
-	void mob_send_missed_db(unsigned int sid, const char * uid_to, const char * having);
+	//void mob_send_missed_db(unsigned int sid, const char * uid_to, const char * having);
 
 	int alljoyn_session_id();
 	const char * alljoyn_join_name();
@@ -67,11 +84,11 @@ extern "C" {
 
 	int mob_open_db(const char *zFilename, sqlite3 **ppDb);
 	int mob_sync_db(sqlite3 * pDb);
-	void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const char * base, const char * sql);
-	void mob_undo_db(unsigned int sid, const char * uid, int snum, const char * base);
-	int mob_close_db(sqlite3 * pDb);
-	void mob_no_missed_db(unsigned int sid, const char * snum);
-	void mob_signal_db(unsigned int sid);
+	//void mob_apply_db(unsigned int sid, const char * uid, int sn, int snum, const char * base, const char * sql);
+	//void mob_undo_db(unsigned int sid, const char * uid, int snum, const char * base);
+//	int mob_close_db(sqlite3 * pDb);
+//	void mob_no_missed_db(unsigned int sid, const char * snum);
+	//void mob_signal_db(unsigned int sid);
 	extern int mob_find_parent_db(unsigned int sid, const char * uid, int snum, const char * base);
 	extern int mob_get_db(unsigned int sid, int num, const char * base, SYNC_DATA * pSD);
 

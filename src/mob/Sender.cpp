@@ -154,7 +154,16 @@ void CALLBACK fnSendSignal(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWORD
 {
 	KillTimer(NULL, idEvent);
 
-	mob_signal_db(alljoyn_session_id());
+	SYNC_SIGNAL ss;
+	sqlite3_stmt *pStmt = NULL;
+
+	strcpy_s(ss.uid, sizeof(ss.uid), gpMob->GetJoinName());
+
+	QUERY_SQL_V(gpMob->GetMainDB(), pStmt, ("SELECT MAX(sn) AS n FROM works WHERE uid = %Q;", ss.uid),
+		ss.sn = sqlite3_column_int(pStmt, 0);
+		if (ss.sn != gpMob->GetSerial()) alljoyn_send(gpMob->GetSessionID(), NULL, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+		break;
+	);
 }
 
 int alljoyn_send(SessionId nSID, const char * pJoiner, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen)

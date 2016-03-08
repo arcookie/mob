@@ -223,11 +223,32 @@ void CSender::Apply(SessionId nSID)
 		vApplies::iterator viter = applies.begin();
 
 		if (viter != applies.end()) {
-			mob_undo_db(nSID, (*viter).uid_p.data(), (*viter).snum_p, mRcvIt->first.data());
+			Block undo;
+			sqlite3_stmt *pStmt2 = NULL;
+			sqlite3_stmt *pStmt3 = NULL;
+
+			QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt2, ("SELECT num FROM works WHERE uid=%Q AND snum=%d AND base=%Q", (*viter).uid_p.data(), (*viter).snum_p, mRcvIt->first.data()),
+				int num = sqlite3_column_int(pStmt2, 0);
+
+				QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt3, ("SELECT undo FROM works WHERE num > %d AND base=%Q ORDER BY num DESC", num, mRcvIt->first.data()),
+					sqlite3_exec(m_pMob->GetMainDB(), (const char *)sqlite3_column_text(pStmt3, 0), 0, 0, 0);
+				);
+				EXECUTE_SQL_V(m_pMob->GetMainDB(), ("DELETE FROM works WHERE num > %d AND base=%Q;REINDEX works;", num, mRcvIt->first.data()));
+				break;
+			);
 
 			for (; viter != applies.end(); viter++) {
 				for (siter = (*viter).applies.begin(); siter != (*viter).applies.end(); siter++) {
-					mob_apply_db(nSID, (*siter).uid.data(), (*siter).sn, (*siter).snum, mRcvIt->first.data(), (*siter).data);
+
+					blkInit(&undo);
+
+					sqlite3_exec(m_pMob->GetMainDB(), (*siter).data, 0, 0, 0);
+					diff_one_table(m_pMob->GetMainDB(), "main", "aux", mRcvIt->first.data(), &undo);
+					sqlite3_exec(m_pMob->GetBackDB(), (*siter).data, 0, 0, 0);
+					EXECUTE_SQL_V(m_pMob->GetUndoDB(), ("INSERT INTO works (uid, sn, snum, base, undo, redo) VALUES (%Q, %d, %d, %Q, %Q, %Q);", (*siter).uid.data(), (*siter).sn, (*siter).snum, mRcvIt->first.data(), undo.z, (*siter).data));
+
+					blkFree(&undo);
+
 					delete (*siter).data;
 				}
 			}
@@ -338,8 +359,26 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 		if (size == sizeof(int) * 2) {
 			switch (iter->second.action) {
 			case ACT_MISSING:
-				mob_send_missed_db(iter->second.wid, msg->GetSender(), iter->second.body.z);
+			{
+				sqlite3_stmt *pStmt = NULL;
+				sqlite3_stmt *pStmt2 = NULL;
+				SYNC_DATA sd;
+
+				strcpy_s(sd.uid, sizeof(sd.uid), m_pMob->GetJoinName());
+
+				QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt2, ("SELECT num, sn, snum, base, undo FROM works WHERE uid=%Q AND sn IN (%s)", sd.uid, iter->second.body.z),
+					sd.sn = sqlite3_column_int(pStmt2, 1);
+					sd.snum = sqlite3_column_int(pStmt2, 2);
+					strcpy_s(sd.base, sizeof(sd.base), (const char *)sqlite3_column_text(pStmt2, 3));
+					QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt, ("SELECT uid, snum FROM works WHERE num > %d AND base=%Q ORDER BY num DESC LIMIT 1", sqlite3_column_int(pStmt2, 0), sd.base),
+						strcpy_s(sd.uid_p, sizeof(sd.uid_p), (const char *)sqlite3_column_text(pStmt, 0));
+						sd.snum_p = sqlite3_column_int(pStmt, 1);
+						alljoyn_send(iter->second.wid, msg->GetSender(), ACT_DATA, (char *)sqlite3_column_text(pStmt2, 4), sqlite3_column_bytes(pStmt2, 4), (const char *)&sd, sizeof(SYNC_DATA));
+						break;
+					);
+				);
 				break;
+			}
 			case ACT_DATA:
 				printf("%s:(%d) %ssqlite>", msg->GetSender(), iter->second.length, iter->second.body);
 				m_mHangar[iter->second.aid].action = iter->second.action;
@@ -424,7 +463,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 			}
 			break;
 			case ACT_NO_MISSED:
-				mob_no_missed_db(iter->second.wid, iter->second.body.z);
+				EXECUTE_SQL_V(m_pMob->GetMainDB(), ("UPDATE works SET sn=%s WHERE num=%d;", iter->second.body.z, iter->second.wid));
 				break;
 			}
 			m_mTrain.erase(iter);
