@@ -88,7 +88,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\mob\AlljoynMob.cpp" />
-    <ClCompile Include="..\src\mob\mob.c" />
     <ClCompile Include="..\src\mob\MobBusListener.cpp" />
     <ClCompile Include="..\src\mob\MobClient.cpp" />
     <ClCompile Include="..\src\mob\MobServer.cpp" />

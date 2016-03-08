@@ -251,21 +251,6 @@ void alljoyn_disconnect(void)
 	}
 }
 
-int alljoyn_session_id()
-{
-	return gpMob->GetSessionID();
-}
-
-const char * alljoyn_join_name()
-{
-	return gpMob->GetJoinName();
-}
-
-const char * get_writable_path()
-{
-	return gWPath.data();
-}
-
 int set_timer(int id, int elapse, TIMERPROC func)
 {
 	return SetTimer(NULL, id, elapse, func);
@@ -280,3 +265,58 @@ void alljoyn_close_db(sqlite3 * pDb)
 {
 	gpMob->CloseDB();
 }
+
+int mob_sync_db(sqlite3 * pDb)
+{
+	SYNC_DATA sd;
+	Block undo, redo;
+
+	blkInit(&undo);
+	blkInit(&redo);
+
+	int wid = gpMob->GetSessionID();
+	sqlite3 * pBackDb = gpMob->GetBackDB();
+	sqlite3 * pUndoDb = gpMob->GetUndoDB();
+	sqlite3_stmt *pStmt = db_prepare(pDb, "SELECT name FROM main.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' UNION\n"
+		"SELECT name FROM aux.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' ORDER BY name");
+
+	strcpy_s(sd.uid, sizeof(sd.uid), gpMob->GetJoinName());
+	strcpy_s(sd.uid_p, sizeof(sd.uid_p), sd.uid);
+
+	while (SQLITE_ROW == sqlite3_step(pStmt)){
+		strcpy_s(sd.base, sizeof(sd.base), (const char*)sqlite3_column_text(pStmt, 0));
+		diff_one_table(pDb, "main", "aux", sd.base, &undo);
+
+		if (undo.z){
+			sd.snum_p = -1;
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT uid, snum FROM works WHERE base = %Q ORDER BY num DESC LIMIT 1;", sd.base),
+				strcpy_s(sd.uid_p, sizeof(sd.uid_p), (const char *)sqlite3_column_text(pStmt, 0));
+				sd.snum_p = sqlite3_column_int(pStmt, 1);
+				break;
+			);
+
+			sd.sn = 1;
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT (MAX(sn) + 1) AS sn FROM works WHERE uid = %Q;", sd.uid), sd.sn = sqlite3_column_int(pStmt, 0); break;);
+
+			sd.snum = 1;
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT (MAX(snum) + 1) AS sn FROM works WHERE uid = %Q AND base = %Q;", sd.uid, sd.base), sd.snum = sqlite3_column_int(pStmt, 0); break;);
+
+			diff_one_table(pDb, "aux", "main", sd.base, &redo);
+			sqlite3_exec(pBackDb, redo.z, 0, 0, 0);
+
+			EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (uid, sn, snum, base, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", sd.uid, sd.sn, sd.snum, sd.base, undo.z, redo.z));
+
+			alljoyn_send(wid, NULL, ACT_DATA, redo.z, redo.nUsed, (const char *)&sd, sizeof(SYNC_DATA));
+
+			blkFree(&redo);
+			blkFree(&undo);
+		}
+	}
+	sqlite3_finalize(pStmt);
+
+	blkFree(&redo);
+	blkFree(&undo);
+
+	return 0;
+}
+

@@ -2003,7 +2003,7 @@ static void writefileFunc(
 static void open_db(ShellState *p, int keepAlive){
   if( p->db==0 ){
     sqlite3_initialize();
-    mob_open_db(p->zDbFilename, &p->db);
+	p->db = alljoyn_open_db(p->zDbFilename);
     globalDb = p->db;
     if( p->db && sqlite3_errcode(p->db)==SQLITE_OK ){
       sqlite3_create_function(p->db, "shellstatic", 0, SQLITE_UTF8, 0,

@@ -18,9 +18,6 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\mob\mob.c">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\mob\sqldiff.c">
       <Filter>소스 파일</Filter>
     </ClCompile>

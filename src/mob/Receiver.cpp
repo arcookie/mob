@@ -175,6 +175,16 @@ BOOL CSender::PushApply(vApplies & applies, const char * base, const char * uid_
 	return TRUE;
 }
 
+int mob_find_parent_db(unsigned int sid, const char * uid, int snum, const char * base)
+{
+	return 0;
+}
+
+int mob_get_db(unsigned int sid, int num, const char * base, SYNC_DATA * pSD)
+{
+	return 0;
+}
+
 void CSender::Apply(SessionId nSID)
 {
 	BOOL bFirst;
