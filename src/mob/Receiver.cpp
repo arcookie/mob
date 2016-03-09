@@ -29,10 +29,11 @@
 #include <qcc/StringUtil.h>
 
 #include "mob.h"
+#include "Global.h"
 #include "Sender.h"
 #include "AlljoynMob.h"
 
-extern qcc::String gWPath;
+vRecvFiles gRecvFiles;
 
 struct find_id : std::unary_function<RECEIVE, bool> {
 	int snum;
@@ -66,11 +67,6 @@ struct find_uri : std::unary_function<FILE_RECV_ITEM, bool> {
 		return (m.wid == wid && m.uid == uid && m.uri == uri);
 	}
 };
-
-vRecvFiles gRecvFiles;
-
-extern int get_file_mtime(const char * path);
-extern long get_file_length(const char * path);
 
 QStatus CSender::SendFile(const char * sJoinName, int nAID, int nAction, SessionId wid, LPCSTR sPath)
 {
@@ -301,32 +297,6 @@ const char * CSender::GetLocalPath(SessionId nSID, const char * pJoiner, const c
 	if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(nSID, pJoiner, sURI))) != gRecvFiles.end())
 		return (*itFiles).path.data();
 	else return NULL;
-}
-
-const qcc::String get_unique_path(const char * ext)
-{
-	FILE *fp;
-	qcc::String sPath;
-	static ULONGLONG ullCount = 0;
-
-	do {
-		sPath = gWPath + qcc::I32ToString(++ullCount) + ext;
-	} while (GetFileAttributes(sPath.data()) != INVALID_FILE_ATTRIBUTES);
-
-	return sPath;
-}
-
-const qcc::String mem2file(const char * data, int length, const char * ext)
-{
-	FILE *fp;
-	qcc::String sPath = get_unique_path(ext);
-
-	if ((fp = fopen(sPath.data(), "wb")) != NULL) {
-		fwrite(data, sizeof(char), length, fp);
-		fclose(fp);
-		return sPath;
-	}
-	return "";
 }
 
 void CSender::MissingCheck(const char * sUID, int nSNum)

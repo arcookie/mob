@@ -27,5 +27,59 @@
 #ifndef _GLOBAL_H_
 #define _GLOBAL_H_
 
+#include "qcc/String.h"
+#include "sqlite3.h"
+
+#define ACT_DATA		0
+#define ACT_FLIST		1
+#define ACT_FLIST_REQ	2
+#define ACT_FILE		3
+#define ACT_MISSING		4
+#define ACT_SIGNAL		5
+#define ACT_NO_MISSED	6
+#define ACT_END			7
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// defines
+
+#define QUERY_SQL(__db__, __stmt__, __sql__, ...)	\
+if (sqlite3_prepare_v2(__db__, __sql__, -1, &__stmt__, NULL) == SQLITE_OK) {\
+	while (sqlite3_step(__stmt__) == SQLITE_ROW) { __VA_ARGS__ } sqlite3_finalize(__stmt__); __stmt__ = NULL; }
+
+#define QUERY_SQL_V(__db__, __stmt__, __sql__, ...)	\
+		{ char * __zSQL__ = sqlite3_mprintf __sql__; if (__zSQL__ && sqlite3_prepare_v2(__db__, __zSQL__, -1, &__stmt__, NULL) == SQLITE_OK) {\
+		while (sqlite3_step(__stmt__) == SQLITE_ROW) { __VA_ARGS__ } sqlite3_finalize(__stmt__); __stmt__ = NULL; }	sqlite3_free(__zSQL__);	}
+
+#define EXECUTE_SQL_V(__db__, __sql__, ...)	\
+		{ char * __zSQL__ = sqlite3_mprintf __sql__; if (__zSQL__) { sqlite3_exec(__db__, __zSQL__, 0, 0, 0); sqlite3_free(__zSQL__); }}
+
+typedef struct {
+	int sn;
+	int snum;
+	int snum_p;
+	char uid[16];
+	char uid_p[16];
+	char base[64];
+} SYNC_DATA;
+
+typedef struct {
+	int sn;
+	char uid[16];
+} SYNC_SIGNAL;
+
+class CAlljoynMob;
+
+extern HANDLE gMutex;
+extern qcc::String gWPath;
+extern CAlljoynMob * gpMob;
+
+extern qcc::String GetVirtualStorePath();
+extern void remove_dir(qcc::String wFile);
+extern int get_file_mtime(const char * path);
+extern long get_file_length(const char * path);
+extern const qcc::String get_unique_path(const char * ext);
+extern const qcc::String mem2file(const char * data, int length, const char * ext);
+extern int alljoyn_send(unsigned int nSID, const char * pJoiner, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen);
+
 #endif /* _GLOBAL_H_ */
 
