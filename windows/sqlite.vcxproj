@@ -83,9 +83,6 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="..\src\sqlite\sqlite3.c" />
   </ItemGroup>
   <ItemGroup>

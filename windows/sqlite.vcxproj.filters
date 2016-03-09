@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="..\src\sqlite\sqlite3.c">
       <Filter>소스 파일</Filter>
     </ClCompile>

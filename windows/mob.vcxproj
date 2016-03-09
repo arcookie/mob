@@ -84,9 +84,6 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="..\src\mob\AlljoynMob.cpp" />
     <ClCompile Include="..\src\mob\block.c" />
     <ClCompile Include="..\src\mob\Export.cpp" />
