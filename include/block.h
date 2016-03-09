@@ -36,7 +36,7 @@ extern "C" {
 
 	extern void blkInit(Block *p);
 	extern void blkFree(Block *p);
-	extern int memCat(Block *p, const char * z, int n);
+	extern int mem2mem(Block *p, const char * z, int n);
 	extern int strPrintf(Block *p, const char *zFormat, ...);
 
 #ifdef __cplusplus

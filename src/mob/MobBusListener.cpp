@@ -52,8 +52,6 @@ void MobBusListener::FoundAdvertisedName(const char* name, TransportMask transpo
 		const char* convName = name + strlen(NAME_PREFIX);
 		printf("Discovered mob conversation: \"%s\"\n", convName);
 
-		/* Join the conversation */
-		/* Since we are in a callback we must enable concurrent callbacks before calling a synchronous method. */
 		pMob->SetSessionHost(name);
 		pMob->EnableConcurrentCallbacks();
 		SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, true, SessionOpts::PROXIMITY_ANY, TRANSPORT_ANY);

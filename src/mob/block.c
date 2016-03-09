@@ -67,7 +67,7 @@ int strPrintf(Block *p, const char *zFormat, ...)
 /*
 ** Add memory block to the end of a Block object
 */
-int memCat(Block *p, const char * z, int n)
+int mem2mem(Block *p, const char * z, int n)
 {
 	int nNew;
 	for (;;){

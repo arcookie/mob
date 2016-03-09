@@ -317,9 +317,9 @@ void CSender::MissingCheck(const char * sUID, int nSNum)
 	m_pMob->SendData(sUID, time(NULL), ACT_NO_MISSED, m_pMob->GetSessionID(), s.data(), s.size());
 }
 
-void CSender::OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg)
+void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg)
 {
-	QCC_UNUSED(member);
+	QCC_UNUSED(pMember);
 	QCC_UNUSED(srcPath);
 
 	uint8_t * data;
@@ -381,7 +381,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 						if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(iter->second.session_id, msg->GetSender(), pFSI->uri))) != gRecvFiles.end()) {
 							if ((*itFiles).mtime == pFSI->mtime && (*itFiles).mtime == pFSI->mtime) continue;
 						}
-						memCat(&data, (char *)pFSI, sizeof(FILE_SEND_ITEM));
+						mem2mem(&data, (char *)pFSI, sizeof(FILE_SEND_ITEM));
 
 						n += sizeof(FILE_SEND_ITEM);
 						pFSI++;
@@ -450,7 +450,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* member, const char*
 			m_mTrain.erase(iter);
 		}
 		else {
-			memCat(&(iter->second.body), (char *)(((int*)data) + 1), size - sizeof(int));
+			mem2mem(&(iter->second.body), (char *)(((int*)data) + 1), size - sizeof(int));
 			iter->second.length += size - sizeof(int);
 		}
 	}

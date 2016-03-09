@@ -165,7 +165,7 @@ public:
 	void MissingCheck(const char * sUID, int nSNum);
 	const char * GetLocalPath(SessionId nSID, const char * pJoiner, const char * sURI);
 	void Save(SessionId nSID, const char * pJoiner, char * sText, int nLength, const char * pExtra, int nExtLen);
-	void OnRecvData(const InterfaceDescription::Member* member, const char* srcPath, Message& msg);
+	void OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg);
 
 	virtual void GetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}
 	virtual void SetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}

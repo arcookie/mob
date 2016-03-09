@@ -173,7 +173,7 @@ int alljoyn_send(unsigned int nSID, const char * pJoiner, int nAction, char * sT
 					fsi.mtime = get_file_mtime(fsi.uri);
 					fsi.fsize = get_file_length(fsi.uri);
 
-					memCat(&data, (char *)&fsi, sizeof(FILE_SEND_ITEM));
+					mem2mem(&data, (char *)&fsi, sizeof(FILE_SEND_ITEM));
 				}
 
 				p = p2 + 1;
