@@ -17,6 +17,7 @@
 **
 ** See the showHelp() routine below for a brief description of how to
 ** run the utility.
+** This source code is a modified copy of sqldiff.c at http://www.sqlite.org
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,7 +25,8 @@
 #include <ctype.h>
 #include <string.h>
 #include <assert.h>
-#include "mob.h"
+#include "dbutil.h"
+#include "block.h"
 
 /* Safely quote an SQL identifier.  Use the minimum amount of transformation
 ** necessary to allow the string to be used with %s.

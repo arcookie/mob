@@ -34,9 +34,9 @@ class CMobClient : public CAlljoynMob {
 public:
 	CMobClient() { m_bJoinComplete = false; }
 
-	virtual QStatus Init(const char * sJoinName);
+	virtual QStatus Init(const char * sSvrName);
 
-	void SetSessionHost(const char* name) { m_sSessionHost = name; }
+	void SetSessionHost(const char * sSessionHost) { m_sSessionHost = sSessionHost; }
 	void SetJoinComplete(bool joinComplete) { m_bJoinComplete = joinComplete; }
 	const char * GetSessionHost() { return (m_sSessionHost.empty() ? NULL : m_sSessionHost.data()); }
 

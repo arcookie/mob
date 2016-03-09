@@ -31,7 +31,7 @@
 #include <alljoyn/BusObject.h>
 #include <vector>
 #include <map>
-#include "mob.h"
+#include "block.h"
 
 using namespace ajn;
 
@@ -100,7 +100,7 @@ typedef struct {
 	int wid;
 	int mtime;
 	long fsize;
-	qcc::String uid;
+	qcc::String joiner;
 	qcc::String uri;
 	qcc::String path;
 } FILE_RECV_ITEM;
@@ -108,20 +108,20 @@ typedef struct {
 typedef std::vector<FILE_RECV_ITEM>		vRecvFiles;
 
 typedef struct {
-	qcc::String uid;
-	qcc::String uid_p;
+	qcc::String joiner;
+	qcc::String joiner_prev;
 	int snum;
-	int snum_p;
+	int snum_prev;
 	int sn_s;
 	int sn_e;
 	std::string data;
 } RECEIVE;
 
 typedef struct {
-	qcc::String uid;
+	qcc::String joiner;
 	int sn;
 	int snum;
-	qcc::String base;
+	qcc::String base_table;
 	const char * data;
 } APPLY;
 
@@ -129,7 +129,7 @@ struct CompareAPPLY
 {
 	bool operator()(APPLY const& _Left, APPLY const& _Right) const
 	{
-		return _Left.uid.compare(_Right.uid) < 0;
+		return _Left.joiner.compare(_Right.joiner) < 0;
 	}
 };
 
@@ -137,8 +137,8 @@ typedef struct CompareAPPLY				compApply;
 typedef std::set<APPLY, compApply>		sApplies;
 
 typedef struct {
-	int snum_p;
-	qcc::String uid_p;
+	int snum_prev;
+	qcc::String joiner_prev;
 	sApplies applies;
 } APPLIES;
 
@@ -152,14 +152,14 @@ class CAlljoynMob;
 class CSender : public BusObject {
 public:
 
-	CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* path);
+	CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* sPath);
 
-	QStatus _Send(SessionId nSID, const char * sJoinName, int nChain, const char * pData, int nLength);
+	QStatus _Send(SessionId nSID, const char * sSvrName, int nChain, const char * pData, int nLength);
 
 	void Apply(SessionId nSID);
-	BOOL PushApply(vApplies & applies, const char * base, const char * uid_p, int snum_p, BOOL bFirst);
-	QStatus SendFile(const char * sJoinName, int nAID, int nAction, SessionId wid, LPCSTR sPath);
-	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
+	BOOL PushApply(vApplies & applies, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst);
+	QStatus SendFile(const char * sSvrName, int nAID, int nAction, SessionId wid, LPCSTR sPath);
+	QStatus SendData(const char * sSvrName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
 	void MissingCheck();
 	void MissingCheck(const char * sUID, int nSNum);

@@ -13,7 +13,9 @@
 #define _MOB_H_
 
 #include "sqlite3.h"
-#include "block.h"
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// defines
 
 #define NAME_PREFIX	"org.alljoyn.bus.arcookie.mob."
 
@@ -24,18 +26,15 @@
 extern "C" {
 #endif
 
-	extern sqlite3_stmt *db_prepare(sqlite3 * pDB, const char *zFormat, ...);
-	extern void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab, Block *out);
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// export functions
 
-	/* alljoyn related functions */
-	extern sqlite3 * alljoyn_open_db(const char *zFilename);
-	extern void alljoyn_close_db(sqlite3 * pDb);
+	extern void mob_disconnect(void);
+	extern int mob_connect(int nIsSvr, const char * sSvrName);
 
-	extern void alljoyn_disconnect(void);
-	extern int alljoyn_connect(const char * advertisedName, const char * joinName);
-
-	/* mob functions */
 	extern int mob_sync_db(sqlite3 * pDb);
+	extern void mob_close_db(sqlite3 * pDb);
+	extern sqlite3 * mob_open_db(const char * sPath);
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */

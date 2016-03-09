@@ -7,11 +7,15 @@
 *
 *   A copy of the license is included with every copy of Mob source code, but you can also read the text of the license here(http://www.arcookie.com/?page_id=414).
 *
+*	This source code is a modified copy of sqldiff.c at http://www.sqlite.org
 */
 
 #include "block.h"
 
 #include <stdarg.h>
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// global functions
 
 /*
 ** Initialize a Block object
@@ -61,7 +65,7 @@ int strPrintf(Block *p, const char *zFormat, ...)
 }
 
 /*
-** Add memory to the end of a Block object
+** Add memory block to the end of a Block object
 */
 int memCat(Block *p, const char * z, int n)
 {

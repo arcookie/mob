@@ -31,6 +31,9 @@
 #include "MobBusListener.h"
 
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CAlljoynMob
+
 CAlljoynMob::CAlljoynMob() 
 {
 	m_pBus = NULL;
@@ -80,7 +83,7 @@ sqlite3 * CAlljoynMob::OpenDB(const char *zFilename)
 			EXECUTE_SQL_V(m_pMainDB, ("PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;ATTACH %Q as aux;", b_path.data()));
 		}
 		if (sqlite3_open(get_unique_path(".db3").data(), &m_pUndoDB))
-			sqlite3_exec(m_pUndoDB, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, uid CHAR(16), sn INT DEFAULT 1, snum INT DEFAULT 1, base VARCHAR(64), undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+			sqlite3_exec(m_pUndoDB, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, joiner CHAR(16), sn INT DEFAULT 1, snum INT DEFAULT 1, base_table VARCHAR(64), undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 
 		return m_pMainDB;
 	}
@@ -88,7 +91,7 @@ sqlite3 * CAlljoynMob::OpenDB(const char *zFilename)
 	return NULL;
 }
 
-QStatus CAlljoynMob::Init(const char * sJoinName)
+QStatus CAlljoynMob::Init(const char * sSvrName)
 {
 	QStatus status = ER_FAIL;
 

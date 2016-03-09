@@ -1,4 +1,6 @@
 /*
+*   Memory block utility functions
+*
 *   2016.2.25
 *
 *   Copyright arCookie. All rights reserved.
@@ -7,6 +9,7 @@
 *
 *   A copy of the license is included with every copy of Mob source code, but you can also read the text of the license here(http://www.arcookie.com/?page_id=414).
 *
+*	This source code is a modified copy of sqldiff.c at http://www.sqlite.org
 */
 
 #ifndef _BLOCK_H_
@@ -19,13 +22,17 @@
 extern "C" {
 #endif
 
-	/* memory block utility functions */
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// types
 
 	typedef struct {
 		char *z;        /* Text of the string */
 		int nAlloc;     /* Bytes allocated in z[] */
 		int nUsed;      /* Bytes actually used in z[] */
 	} Block;
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// global functions
 
 	extern void blkInit(Block *p);
 	extern void blkFree(Block *p);

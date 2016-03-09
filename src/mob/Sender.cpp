@@ -33,7 +33,7 @@
 #include "Sender.h"
 #include "AlljoynMob.h"
 
-CSender::CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* path) : m_pMob(pMob), BusObject(path), m_pMobSignalMember(NULL)
+CSender::CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* sPath) : m_pMob(pMob), BusObject(sPath), m_pMobSignalMember(NULL)
 {
 	QStatus status;
 
@@ -57,7 +57,7 @@ CSender::CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* path) : m_p
 	}
 }
 
-QStatus CSender::_Send(SessionId nSID, const char * sJoinName, int nChain, const char * pData, int nLength)
+QStatus CSender::_Send(SessionId nSID, const char * sSvrName, int nChain, const char * pData, int nLength)
 {
 	uint8_t flags = 0;
 	QStatus status = ER_FAIL;
@@ -71,7 +71,7 @@ QStatus CSender::_Send(SessionId nSID, const char * sJoinName, int nChain, const
 
 		MsgArg mobArg("ay", l, pBuf);
 
-		status = Signal(sJoinName, nSID, *m_pMobSignalMember, &mobArg, 1, 0, flags);
+		status = Signal(sSvrName, nSID, *m_pMobSignalMember, &mobArg, 1, 0, flags);
 
 		delete[] pBuf;
 	}
@@ -79,7 +79,7 @@ QStatus CSender::_Send(SessionId nSID, const char * sJoinName, int nChain, const
 	return status;
 }
 
-QStatus CSender::SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra, int nExtLen)
+QStatus CSender::SendData(const char * sSvrName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra, int nExtLen)
 {
 	TRAIN_HEADER th;
 	uint8_t flags = 0;
@@ -96,11 +96,11 @@ QStatus CSender::SendData(const char * sJoinName, int nAID, int nAction, Session
 	QStatus status;
 	MsgArg mobArg("ay", sizeof(TRAIN_HEADER), &th);
 
-	if ((status = Signal(sJoinName, wid, *m_pMobSignalMember, &mobArg, 1, 0, flags)) == ER_OK && nLength > 0) {
+	if ((status = Signal(sSvrName, wid, *m_pMobSignalMember, &mobArg, 1, 0, flags)) == ER_OK && nLength > 0) {
 		int l = nLength > SEND_BUF ? SEND_BUF : nLength;
 		const char * p = msg;
 
-		while ((status = _Send(wid, sJoinName, th.chain, p, l)) == ER_OK) {
+		while ((status = _Send(wid, sSvrName, th.chain, p, l)) == ER_OK) {
 			if (nLength > SEND_BUF) {
 				nLength -= SEND_BUF;
 				p += SEND_BUF;
@@ -108,7 +108,7 @@ QStatus CSender::SendData(const char * sJoinName, int nAID, int nAction, Session
 			}
 			else break;
 		}
-		_Send(wid, sJoinName, th.chain, 0, -1);
+		_Send(wid, sSvrName, th.chain, 0, -1);
 	}
 
 	return status;

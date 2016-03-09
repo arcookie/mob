@@ -33,7 +33,7 @@ void CDECL_CALL SigIntHandler(int /*sig*/)
 	CMobClient::s_interrupt = true;
 }
 
-QStatus CMobClient::Init(const char * sJoinName)
+QStatus CMobClient::Init(const char * sSvrName)
 {
 	/* Install SIGINT handler. */
 	signal(SIGINT, SigIntHandler);
@@ -42,13 +42,13 @@ QStatus CMobClient::Init(const char * sJoinName)
 
 	if (ER_OK == status) {
 		/* Begin discovery on the well-known name of the service to be called */
-		status = m_pBus->FindAdvertisedName(sJoinName);
+		status = m_pBus->FindAdvertisedName(sSvrName);
 
 		if (status == ER_OK) {
-			printf("org.alljoyn.Bus.FindAdvertisedName ('%s') succeeded.\n", sJoinName);
+			printf("org.alljoyn.Bus.FindAdvertisedName ('%s') succeeded.\n", sSvrName);
 		}
 		else {
-			printf("org.alljoyn.Bus.FindAdvertisedName ('%s') failed (%s).\n", sJoinName, QCC_StatusText(status));
+			printf("org.alljoyn.Bus.FindAdvertisedName ('%s') failed (%s).\n", sSvrName, QCC_StatusText(status));
 		}
 	}
 

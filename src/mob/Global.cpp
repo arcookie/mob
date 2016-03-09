@@ -36,20 +36,20 @@ qcc::String gWPath;
 HANDLE gMutex = NULL;
 CAlljoynMob * gpMob = NULL;
 
-const qcc::String get_unique_path(const char * ext)
+const qcc::String get_unique_path(const char * sExt)
 {
 	FILE *fp;
 	qcc::String sPath;
 	static ULONGLONG ullCount = 0;
 
 	do {
-		sPath = gWPath + qcc::I32ToString(++ullCount) + ext;
+		sPath = gWPath + qcc::I32ToString(++ullCount) + sExt;
 	} while (GetFileAttributes(sPath.data()) != INVALID_FILE_ATTRIBUTES);
 
 	return sPath;
 }
 
-qcc::String GetVirtualStorePath()
+qcc::String get_writable_path()
 {
 	CHAR buffer[MAX_PATH];
 
@@ -58,17 +58,17 @@ qcc::String GetVirtualStorePath()
 	return qcc::String(buffer) + "\\mob\\";
 }
 
-void remove_dir(qcc::String wFile)
+void remove_dir(qcc::String sPath)
 {
 	HANDLE				hFile;
 	WIN32_FIND_DATA		nFileSizeLow;
 	qcc::String			sFile;
 
-	if ((hFile = FindFirstFile((wFile + "*.*").data(), &nFileSizeLow)) != INVALID_HANDLE_VALUE){
+	if ((hFile = FindFirstFile((sPath + "*.*").data(), &nFileSizeLow)) != INVALID_HANDLE_VALUE){
 		do {
 			sFile = nFileSizeLow.cFileName;
 			if (!sFile.empty() && sFile != "." && sFile != ".."){
-				sFile = wFile + sFile;
+				sFile = sPath + sFile;
 				if (nFileSizeLow.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY){
 					remove_dir(sFile + "\\");
 					RemoveDirectory(sFile.data());
@@ -84,11 +84,11 @@ void remove_dir(qcc::String wFile)
 	}
 }
 
-int get_file_mtime(const char * path)
+int get_file_mtime(const char * sPath)
 {
 	HANDLE fh;
 
-	if ((fh = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
+	if ((fh = CreateFile(sPath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
 		FILETIME modtime;
 		SYSTEMTIME stUTC;
 		char buf[32];
@@ -107,12 +107,12 @@ int get_file_mtime(const char * path)
 	return 0;
 }
 
-long get_file_length(const char * path)
+long get_file_length(const char * sPath)
 {
 	FILE *fp;
 	long sz;
 
-	if ((fp = fopen(path, "rb")) != NULL) {
+	if ((fp = fopen(sPath, "rb")) != NULL) {
 		fseek(fp, 0, SEEK_END);
 		sz = ftell(fp);
 		fclose(fp);
@@ -121,10 +121,10 @@ long get_file_length(const char * path)
 	return 0L;
 }
 
-const qcc::String mem2file(const char * data, int length, const char * ext)
+const qcc::String mem2file(const char * data, int length, const char * sExt)
 {
 	FILE *fp;
-	qcc::String sPath = get_unique_path(ext);
+	qcc::String sPath = get_unique_path(sExt);
 
 	if ((fp = fopen(sPath.data(), "wb")) != NULL) {
 		fwrite(data, sizeof(char), length, fp);
@@ -141,12 +141,12 @@ void CALLBACK fnSendSignal(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWORD
 	SYNC_SIGNAL ss;
 	sqlite3_stmt *pStmt = NULL;
 
-	strcpy_s(ss.uid, sizeof(ss.uid), gpMob->GetJoinName());
+	strcpy_s(ss.joiner, sizeof(ss.joiner), gpMob->GetJoinName());
 
-	QUERY_SQL_V(gpMob->GetMainDB(), pStmt, ("SELECT MAX(sn) AS n FROM works WHERE uid = %Q;", ss.uid),
+	QUERY_SQL_V(gpMob->GetMainDB(), pStmt, ("SELECT MAX(sn) AS n FROM works WHERE joiner = %Q;", ss.joiner),
 		ss.sn = sqlite3_column_int(pStmt, 0);
-	if (ss.sn != gpMob->GetSerial()) alljoyn_send(gpMob->GetSessionID(), NULL, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
-	break;
+		if (ss.sn != gpMob->GetSerial()) alljoyn_send(gpMob->GetSessionID(), NULL, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+		break;
 	);
 }
 

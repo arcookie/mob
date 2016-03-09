@@ -32,7 +32,7 @@
 class CMobServer : public CAlljoynMob {
 public:
 	CMobServer() {}
-	virtual QStatus Init(const char * sAdvertiseName);
+	virtual QStatus Init(const char * sSvrName);
 };
 
 #endif /* _MOB_SERVER_H_ */

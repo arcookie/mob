@@ -9,8 +9,11 @@
 *
 */
 
-#ifndef _BLOCK_H_
-#define _BLOCK_H_
+#ifndef _DBUTIL_H_
+#define _DBUTIL_H_
+
+#include "sqlite3.h"
+#include "block.h"
 
 /*
 ** Make sure we can call this stuff from C++.
@@ -19,21 +22,11 @@
 extern "C" {
 #endif
 
-	/* memory block utility functions */
-
-	typedef struct {
-		char *z;        /* Text of the string */
-		int nAlloc;     /* Bytes allocated in z[] */
-		int nUsed;      /* Bytes actually used in z[] */
-	} Block;
-
-	extern void blkInit(Block *p);
-	extern void blkFree(Block *p);
-	extern int memCat(Block *p, const char * z, int n);
-	extern int strPrintf(Block *p, const char *zFormat, ...);
+	extern sqlite3_stmt *db_prepare(sqlite3 * pDB, const char *zFormat, ...);
+	extern void diff_one_table(sqlite3 * pDB, const char *zMain, const char *zAux, const char *zTab, Block *out);
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */
 #endif
 
-#endif /* _BLOCK_H_ */
+#endif /* _DBUTIL_H_ */

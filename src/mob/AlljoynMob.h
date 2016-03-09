@@ -30,6 +30,8 @@
 
 #include <alljoyn/BusAttachment.h>
 
+#include "sqlite3.h"
+#include "block.h"
 #include "Sender.h"
 #include "MobBusListener.h"
 
@@ -44,7 +46,7 @@ public:
 	CAlljoynMob();
 	~CAlljoynMob();
 
-	virtual QStatus Init(const char * sJoinName);
+	virtual QStatus Init(const char * sSvrName);
 
 	void CloseDB();
 	sqlite3 * OpenDB(const char *zFilename);
@@ -64,8 +66,8 @@ public:
 		return m_pBus->JoinSession(sessionHost, sessionPort, listener, sessionId, opts);
 	}
 	QStatus SetLinkTimeout(SessionId sessionid, uint32_t& linkTimeout) { return m_pBus->SetLinkTimeout(sessionid, linkTimeout); }
-	QStatus SendData(const char * sJoinName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0) { 
-		return m_pSender->SendData(sJoinName, nAID, nAction, wid, msg, nLength, pExtra, nExtLen); 
+	QStatus SendData(const char * sSvrName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0) { 
+		return m_pSender->SendData(sSvrName, nAID, nAction, wid, msg, nLength, pExtra, nExtLen); 
 	}
 
 protected:
