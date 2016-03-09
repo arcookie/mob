@@ -59,7 +59,7 @@ if (sqlite3_prepare_v2(__db__, __sql__, -1, &__stmt__, NULL) == SQLITE_OK) {\
 // types
 
 typedef struct {
-	int sn;
+	int auto_inc;
 	int snum;
 	int snum_prev;
 	char joiner[16];
@@ -68,7 +68,7 @@ typedef struct {
 } SYNC_DATA;
 
 typedef struct {
-	int sn;
+	int auto_inc;
 	char joiner[16];
 } SYNC_SIGNAL;
 

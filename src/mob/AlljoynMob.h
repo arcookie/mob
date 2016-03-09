@@ -66,8 +66,8 @@ public:
 		return m_pBus->JoinSession(sessionHost, sessionPort, listener, sessionId, opts);
 	}
 	QStatus SetLinkTimeout(SessionId sessionid, uint32_t& linkTimeout) { return m_pBus->SetLinkTimeout(sessionid, linkTimeout); }
-	QStatus SendData(const char * sSvrName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0) { 
-		return m_pSender->SendData(sSvrName, nAID, nAction, wid, msg, nLength, pExtra, nExtLen); 
+	QStatus SendData(const char * sSvrName, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0) { 
+		return m_pSender->SendData(sSvrName, nFootPrint, nAction, sessionId, msg, nLength, pExtra, nExtLen); 
 	}
 
 protected:

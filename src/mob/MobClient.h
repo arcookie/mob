@@ -37,7 +37,7 @@ public:
 	virtual QStatus Init(const char * sSvrName);
 
 	void SetSessionHost(const char * sSessionHost) { m_sSessionHost = sSessionHost; }
-	void SetJoinComplete(bool joinComplete) { m_bJoinComplete = joinComplete; }
+	void SetJoinComplete(bool bJoinComplete) { m_bJoinComplete = bJoinComplete; }
 	const char * GetSessionHost() { return (m_sSessionHost.empty() ? NULL : m_sSessionHost.data()); }
 
 private:

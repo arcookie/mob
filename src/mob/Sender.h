@@ -65,8 +65,8 @@ using namespace ajn;
 
 typedef struct {
 	int marks[TRAIN_MARK_END];
-	int aid;  // action id
-	int wid;  // doc id
+	int footprint;  // 
+	int session_id;  // session id
 	int action; // 0 data, 1 file list 2 file list req 3 file
 	int chain;
 	char extra[TRAIN_EXTRA_LEN];
@@ -82,8 +82,8 @@ public:
 		blkFree(&body);
 	}
 
-	int aid;  // action id
-	int wid;  // doc id
+	int footprint;  // 
+	int session_id;  // session id
 	int action; // 0 data, 1 file list 2 file list req 3 file
 	int length;
 	char extra[TRAIN_EXTRA_LEN];
@@ -97,30 +97,30 @@ typedef struct {
 } FILE_SEND_ITEM;
 
 typedef struct {
-	int wid;
+	int session_id;
 	int mtime;
 	long fsize;
-	qcc::String joiner;
 	qcc::String uri;
 	qcc::String path;
+	qcc::String joiner;
 } FILE_RECV_ITEM;
 
 typedef std::vector<FILE_RECV_ITEM>		vRecvFiles;
 
 typedef struct {
-	qcc::String joiner;
-	qcc::String joiner_prev;
 	int snum;
 	int snum_prev;
-	int sn_s;
-	int sn_e;
+	int auto_inc_start;
+	int auto_inc_end;
+	qcc::String joiner;
+	qcc::String joiner_prev;
 	std::string data;
 } RECEIVE;
 
 typedef struct {
-	qcc::String joiner;
-	int sn;
 	int snum;
+	int auto_inc;
+	qcc::String joiner;
 	qcc::String base_table;
 	const char * data;
 } APPLY;
@@ -158,8 +158,8 @@ public:
 
 	void Apply(SessionId nSID);
 	BOOL PushApply(vApplies & applies, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst);
-	QStatus SendFile(const char * sSvrName, int nAID, int nAction, SessionId wid, LPCSTR sPath);
-	QStatus SendData(const char * sSvrName, int nAID, int nAction, SessionId wid, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
+	QStatus SendFile(const char * sSvrName, int nFootPrint, int nAction, SessionId sessionId, LPCSTR sPath);
+	QStatus SendData(const char * sSvrName, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
 	void MissingCheck();
 	void MissingCheck(const char * sUID, int nSNum);
@@ -174,8 +174,8 @@ private:
 	CAlljoynMob *						m_pMob;
 	std::map<int, TRAIN>				m_mTrain;
 	std::map<int, TRAIN>				m_mHangar;
-	const InterfaceDescription::Member* m_pMobSignalMember;
 	mReceives							m_mReceives;
+	const InterfaceDescription::Member* m_pMobSignalMember;
 };
 
 #endif /* _SENDER_H_ */
