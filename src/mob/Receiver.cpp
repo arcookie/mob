@@ -69,7 +69,7 @@ struct find_uri : std::unary_function<FILE_RECV_ITEM, bool> {
 	}
 };
 
-QStatus CSender::SendFile(const char * sSvrName, int nFootPrint, int nAction, SessionId sessionId, LPCSTR sPath)
+QStatus CSender::SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, LPCSTR sPath)
 {
 	FILE *fp;
 	QStatus status = ER_OK;
@@ -95,11 +95,11 @@ QStatus CSender::SendFile(const char * sSvrName, int nFootPrint, int nAction, Se
 
 		MsgArg mobArg("ay", sizeof(TRAIN_HEADER), &th);
 
-		if ((status = Signal(sSvrName, sessionId, *m_pMobSignalMember, &mobArg, 1, 0, flags)) == ER_OK) {
+		if ((status = Signal(sJoiner, sessionId, *m_pMobSignalMember, &mobArg, 1, 0, flags)) == ER_OK) {
 			while ((l = fread(Buf, sizeof(BYTE), SEND_BUF, fp)) > 0) {
-				if ((status = _Send(sessionId, sSvrName, th.chain, (const char *)Buf, l)) != ER_OK) break;
+				if ((status = _Send(sessionId, sJoiner, th.chain, (const char *)Buf, l)) != ER_OK) break;
 			}
-			_Send(sessionId, sSvrName, th.chain, 0, -1);
+			_Send(sessionId, sJoiner, th.chain, 0, -1);
 		}
 
 		fclose(fp);
@@ -338,7 +338,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 		memcpy(train[pTH->chain].extra, pTH->extra, TRAIN_EXTRA_LEN);
 	}
 	else if ((iter = train.find(((int*)data)[0])) != train.end()){
-		if (size == sizeof(int) * 2) {
+		if (size == sizeof(int)) {
 			switch (iter->second.action) {
 			case ACT_MISSING:
 			{
@@ -362,14 +362,16 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 				break;
 			}
 			case ACT_DATA:
-				printf("%s:(%d) %ssqlite>", msg->GetSender(), iter->second.length, iter->second.body);
-				m_mHangar[iter->second.footprint].action = iter->second.action;
-				memcpy(m_mHangar[iter->second.footprint].body.z, iter->second.body.z, iter->second.length);
-				m_mHangar[iter->second.footprint].length = iter->second.length;
-				memcpy(m_mHangar[iter->second.footprint].extra, iter->second.extra, TRAIN_EXTRA_LEN);
+			{
+				printf("%s: %ssqlite>", msg->GetSender(), iter->second.body);
+				TRAIN & cargo = m_mStation[pJoiner][iter->second.footprint];
+				cargo.action = iter->second.action;
+				memcpy(cargo.body.z, iter->second.body.z, iter->second.body.nUsed);
+				memcpy(cargo.extra, iter->second.extra, TRAIN_EXTRA_LEN);
 				break;
+			}
 			case ACT_FLIST:
-				if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
+				if (sizeof(FILE_SEND_ITEM) % iter->second.body.nUsed == 0) {
 					int n = 0;
 					Block data;
 					vRecvFiles::iterator itFiles;
@@ -377,7 +379,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 
 					blkInit(&data);
 
-					while (n < iter->second.length) {
+					while (n < iter->second.body.nUsed) {
 						if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, msg->GetSender(), pFSI->uri))) != gRecvFiles.end()) {
 							if ((*itFiles).mtime == pFSI->mtime && (*itFiles).mtime == pFSI->mtime) continue;
 						}
@@ -392,11 +394,11 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 				}
 				break;
 			case ACT_FLIST_REQ:
-				if (sizeof(FILE_SEND_ITEM) % iter->second.length == 0) {
+				if (sizeof(FILE_SEND_ITEM) % iter->second.body.nUsed == 0) {
 					int n = 0;
 					FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body.z;
 
-					while (n < iter->second.length) {
+					while (n < iter->second.body.nUsed) {
 						SendFile(msg->GetSender(), iter->second.footprint, ACT_FILE, sessionId, pFSI->uri);
 						n += sizeof(FILE_SEND_ITEM);
 						pFSI++;
@@ -424,34 +426,31 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 
 					gRecvFiles.push_back(fri);
 				}
+				break;
 			}
-			break;
 			case ACT_END:
 			{
 				std::map<int, TRAIN>::iterator _iter;
 
-				if ((_iter = m_mHangar.find(iter->second.footprint)) != m_mHangar.end()){
-					Save(sessionId, msg->GetSender(), _iter->second.body.z, _iter->second.length, _iter->second.extra, TRAIN_EXTRA_LEN);
-					m_mHangar.erase(_iter);
+				if ((_iter = m_mStation[pJoiner].find(iter->second.footprint)) != m_mStation[pJoiner].end()){
+					Save(sessionId, msg->GetSender(), _iter->second.body.z, _iter->second.body.nUsed, _iter->second.extra, TRAIN_EXTRA_LEN);
+					m_mStation[pJoiner].erase(_iter);
 				}
+				break;
 			}
-			break;
 			case ACT_SIGNAL:
 			{
 				SYNC_SIGNAL * pSS = (SYNC_SIGNAL *)iter->second.extra;
 
 				if (pSS) MissingCheck(pSS->joiner, pSS->auto_inc);
+				break;
 			}
-			break;
 			case ACT_NO_MISSED:
 				EXECUTE_SQL_V(m_pMob->GetMainDB(), ("UPDATE works SET auto_inc=%s WHERE num=%d;", iter->second.body.z, sessionId));
 				break;
 			}
 			train.erase(iter);
 		}
-		else {
-			mem2mem(&(iter->second.body), (char *)(((int*)data) + 1), size - sizeof(int));
-			iter->second.length += size - sizeof(int);
-		}
+		else mem2mem(&(iter->second.body), (char *)(((int*)data) + 1), size - sizeof(int));
 	}
 }

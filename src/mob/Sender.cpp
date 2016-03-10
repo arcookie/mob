@@ -79,7 +79,7 @@ QStatus CSender::_Send(SessionId nSID, const char * sSvrName, int nChain, const 
 	return status;
 }
 
-QStatus CSender::SendData(const char * sSvrName, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra, int nExtLen)
+QStatus CSender::SendData(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra, int nExtLen)
 {
 	TRAIN_HEADER th;
 	uint8_t flags = 0;
@@ -95,11 +95,11 @@ QStatus CSender::SendData(const char * sSvrName, int nFootPrint, int nAction, Se
 	QStatus status;
 	MsgArg mobArg("ay", sizeof(TRAIN_HEADER), &th);
 
-	if ((status = Signal(sSvrName, sessionId, *m_pMobSignalMember, &mobArg, 1, 0, flags)) == ER_OK && nLength > 0) {
+	if ((status = Signal(sJoiner, sessionId, *m_pMobSignalMember, &mobArg, 1, 0, flags)) == ER_OK && nLength > 0) {
 		int l = nLength > SEND_BUF ? SEND_BUF : nLength;
 		const char * p = msg;
 
-		while ((status = _Send(sessionId, sSvrName, th.chain, p, l)) == ER_OK) {
+		while ((status = _Send(sessionId, sJoiner, th.chain, p, l)) == ER_OK) {
 			if (nLength > SEND_BUF) {
 				nLength -= SEND_BUF;
 				p += SEND_BUF;
@@ -107,7 +107,7 @@ QStatus CSender::SendData(const char * sSvrName, int nFootPrint, int nAction, Se
 			}
 			else break;
 		}
-		_Send(sessionId, sSvrName, th.chain, 0, -1);
+		_Send(sessionId, sJoiner, th.chain, 0, -1);
 	}
 
 	return status;

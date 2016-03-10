@@ -74,7 +74,6 @@ typedef struct {
 class TRAIN {
 public:
 	TRAIN() {
-		length = 0;
 		blkInit(&body);
 	}
 	~TRAIN() {
@@ -83,7 +82,6 @@ public:
 
 	int footprint;  // 
 	int action; // 0 data, 1 file list 2 file list req 3 file
-	int length;
 	char extra[TRAIN_EXTRA_LEN];
 	Block body;
 };
@@ -158,8 +156,8 @@ public:
 
 	void Apply(SessionId nSID);
 	BOOL PushApply(vApplies & applies, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst);
-	QStatus SendFile(const char * sSvrName, int nFootPrint, int nAction, SessionId sessionId, LPCSTR sPath);
-	QStatus SendData(const char * sSvrName, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
+	QStatus SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, LPCSTR sPath);
+	QStatus SendData(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
 	void MissingCheck();
 	void MissingCheck(const char * sUID, int nSNum);
@@ -173,7 +171,7 @@ public:
 private:
 	CAlljoynMob *						m_pMob;
 	mTrains								m_mTrain;
-	mTrain								m_mHangar;
+	mTrains								m_mStation;
 	mReceives							m_mReceives;
 	const InterfaceDescription::Member* m_pMobSignalMember;
 };
