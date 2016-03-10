@@ -78,7 +78,6 @@ void MobBusListener::FoundAdvertisedName(const char* name, TransportMask transpo
 void MobBusListener::SessionJoined(SessionPort /*sessionPort*/, SessionId id, const char* joiner)
 {
 	m_pMob->SetSessionID(id);
-	m_pMob->SetJoinName(joiner);
 
 	printf("SessionJoined with %s (id=%d)\n", joiner, id);
 	m_pMob->EnableConcurrentCallbacks();

@@ -26,11 +26,11 @@
 
 #include "MobClient.h"
 
-volatile sig_atomic_t CMobClient::s_interrupt = false;
+volatile sig_atomic_t s_interrupt = false;
 
 void CDECL_CALL SigIntHandler(int /*sig*/)
 {
-	CMobClient::s_interrupt = true;
+	s_interrupt = true;
 }
 
 QStatus CMobClient::Init(const char * sSvrName)

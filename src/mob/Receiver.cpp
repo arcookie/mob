@@ -322,21 +322,23 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 	QCC_UNUSED(pMember);
 	QCC_UNUSED(srcPath);
 
+	const char * pJoiner = msg->GetSender();
 	uint8_t * data;
 	size_t size;
 	std::map<int, TRAIN>::iterator iter;
+	mTrain & train = m_mTrain[pJoiner];
 
 	msg->GetArg(0)->Get("ay", &size, &data);
 
 	if (IS_TRAIN_HEADER(data) && size == sizeof(TRAIN_HEADER)) {
 		TRAIN_HEADER * pTH = (TRAIN_HEADER *)data;
 
-		m_mTrain[pTH->chain].action = pTH->action;
-		m_mTrain[pTH->chain].footprint = pTH->footprint;
-		m_mTrain[pTH->chain].session_id = pTH->session_id;
-		memcpy(m_mTrain[pTH->chain].extra, pTH->extra, TRAIN_EXTRA_LEN);
+		train[pTH->chain].action = pTH->action;
+		train[pTH->chain].footprint = pTH->footprint;
+		train[pTH->chain].session_id = pTH->session_id;
+		memcpy(train[pTH->chain].extra, pTH->extra, TRAIN_EXTRA_LEN);
 	}
-	else if ((iter = m_mTrain.find(((int*)data)[0])) != m_mTrain.end()){
+	else if ((iter = train.find(((int*)data)[0])) != train.end()){
 		if (size == sizeof(int) * 2) {
 			switch (iter->second.action) {
 			case ACT_MISSING:
@@ -447,7 +449,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 				EXECUTE_SQL_V(m_pMob->GetMainDB(), ("UPDATE works SET auto_inc=%s WHERE num=%d;", iter->second.body.z, iter->second.session_id));
 				break;
 			}
-			m_mTrain.erase(iter);
+			train.erase(iter);
 		}
 		else {
 			mem2mem(&(iter->second.body), (char *)(((int*)data) + 1), size - sizeof(int));

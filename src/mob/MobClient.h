@@ -43,9 +43,6 @@ public:
 private:
 	qcc::String m_sSessionHost;
 	bool		m_bJoinComplete;
-
-public:
-	static volatile sig_atomic_t s_interrupt;
 };
 
 #endif /* _MOB_CLIENT_H_ */

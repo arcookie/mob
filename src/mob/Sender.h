@@ -142,6 +142,8 @@ typedef struct {
 	sApplies applies;
 } APPLIES;
 
+typedef std::map<int, TRAIN>				mTrain;
+typedef std::map<qcc::String, mTrain>		mTrains;
 typedef std::vector<APPLIES>				vApplies;
 typedef std::map<qcc::String, vApplies>		mApplies;
 typedef std::vector<RECEIVE>				vReceives;
@@ -172,8 +174,8 @@ public:
 
 private:
 	CAlljoynMob *						m_pMob;
-	std::map<int, TRAIN>				m_mTrain;
-	std::map<int, TRAIN>				m_mHangar;
+	mTrains								m_mTrain;
+	mTrain								m_mHangar;
 	mReceives							m_mReceives;
 	const InterfaceDescription::Member* m_pMobSignalMember;
 };

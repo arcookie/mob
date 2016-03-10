@@ -78,11 +78,11 @@ sqlite3 * CAlljoynMob::OpenDB(const char *zFilename)
 	if (sqlite3_open(zFilename, &m_pMainDB) == SQLITE_OK) {
 		qcc::String b_path = get_unique_path(".db3");
 
-		if (sqlite3_open(b_path.data(), &m_pBackDB)) {
+		if (sqlite3_open(b_path.data(), &m_pBackDB) == SQLITE_OK) {
 			sqlite3_exec(m_pBackDB, "PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 			EXECUTE_SQL_V(m_pMainDB, ("PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;ATTACH %Q as aux;", b_path.data()));
 		}
-		if (sqlite3_open(get_unique_path(".db3").data(), &m_pUndoDB))
+		if (sqlite3_open(get_unique_path(".db3").data(), &m_pUndoDB) == SQLITE_OK)
 			sqlite3_exec(m_pUndoDB, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, joiner CHAR(16), auto_inc INT DEFAULT 1, snum INT DEFAULT 1, base_table VARCHAR(64), undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 
 		return m_pMainDB;
@@ -103,7 +103,7 @@ QStatus CAlljoynMob::Init(const char * sSvrName)
 		status = m_pBus->CreateInterface(MOB_SERVICE_INTERFACE_NAME, mobIntf);
 
 		if (ER_OK == status) {
-			mobIntf->AddSignal("mob", "ay", "data", 0);
+			mobIntf->AddSignal("Mob", "ay", "data", 0);
 			mobIntf->Activate();
 		}
 		else {

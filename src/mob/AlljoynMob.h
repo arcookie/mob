@@ -59,8 +59,7 @@ public:
 	void MissingCheck()	{ m_pSender->MissingCheck(); }
 	SessionId GetSessionID() { return m_nSessionID; }
 	void SetSessionID(SessionId id) { m_nSessionID = id; }
-	const char * GetJoinName() { return m_sJoiner.data(); }
-	void SetJoinName(const char * name) { m_sJoiner = name; }
+	const char * GetJoinName() { return m_pBus->GetUniqueName().data(); }
 	void EnableConcurrentCallbacks() { m_pBus->EnableConcurrentCallbacks(); }
 	QStatus JoinSession(const char* sessionHost, SessionPort sessionPort, SessionListener* listener, SessionId& sessionId, SessionOpts& opts) {
 		return m_pBus->JoinSession(sessionHost, sessionPort, listener, sessionId, opts);
@@ -74,7 +73,6 @@ protected:
 	ajn::BusAttachment *	m_pBus;
 	int						m_nSerial;
 	CSender*				m_pSender;
-	qcc::String				m_sJoiner;
 	SessionId				m_nSessionID;
 	MobBusListener			m_BusListener;
 
