@@ -87,7 +87,6 @@ QStatus CSender::SendData(const char * sSvrName, int nFootPrint, int nAction, Se
 	TRAIN_HEADER(th.marks);
 
 	th.footprint = nFootPrint;
-	th.session_id = sessionId;
 	th.action = nAction;
 	th.chain = time(NULL);
 

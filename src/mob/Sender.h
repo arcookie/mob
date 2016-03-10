@@ -66,7 +66,6 @@ using namespace ajn;
 typedef struct {
 	int marks[TRAIN_MARK_END];
 	int footprint;  // 
-	int session_id;  // session id
 	int action; // 0 data, 1 file list 2 file list req 3 file
 	int chain;
 	char extra[TRAIN_EXTRA_LEN];
@@ -83,7 +82,6 @@ public:
 	}
 
 	int footprint;  // 
-	int session_id;  // session id
 	int action; // 0 data, 1 file list 2 file list req 3 file
 	int length;
 	char extra[TRAIN_EXTRA_LEN];
