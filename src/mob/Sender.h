@@ -71,15 +71,7 @@ typedef struct {
 	char extra[TRAIN_EXTRA_LEN];
 } TRAIN_HEADER;
 
-class TRAIN {
-public:
-	TRAIN() {
-		blkInit(&body);
-	}
-	~TRAIN() {
-		blkFree(&body);
-	}
-
+typedef struct TRAIN {
 	int footprint;  // 
 	int action; // 0 data, 1 file list 2 file list req 3 file
 	char extra[TRAIN_EXTRA_LEN];
@@ -151,17 +143,17 @@ public:
 
 	CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* sPath);
 
-	QStatus _Send(SessionId nSID, const char * sSvrName, int nChain, const char * pData, int nLength);
+	QStatus _Send(SessionId sessionId, const char * sSvrName, int nChain, const char * pData, int nLength);
 
-	void Apply(SessionId nSID);
+	void Apply(SessionId sessionId);
 	BOOL PushApply(vApplies & applies, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst);
 	QStatus SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, LPCSTR sPath);
 	QStatus SendData(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
 	void MissingCheck();
-	void MissingCheck(const char * sUID, int nSNum);
-	const char * GetLocalPath(SessionId nSID, const char * pJoiner, const char * sURI);
-	void Save(SessionId nSID, const char * pJoiner, char * sText, int nLength, const char * pExtra, int nExtLen);
+	void MissingCheck(const char * sJoiner, int nSNum);
+	const char * GetLocalPath(SessionId sessionId, const char * pJoiner, const char * sURI);
+	void Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen);
 	void OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg);
 
 	virtual void GetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}

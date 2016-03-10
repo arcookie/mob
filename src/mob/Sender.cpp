@@ -57,7 +57,7 @@ CSender::CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* sPath) : m_
 	}
 }
 
-QStatus CSender::_Send(SessionId nSID, const char * sSvrName, int nChain, const char * pData, int nLength)
+QStatus CSender::_Send(SessionId sessionId, const char * sSvrName, int nChain, const char * pData, int nLength)
 {
 	uint8_t flags = 0;
 	QStatus status = ER_FAIL;
@@ -71,7 +71,7 @@ QStatus CSender::_Send(SessionId nSID, const char * sSvrName, int nChain, const 
 
 		MsgArg mobArg("ay", l, pBuf);
 
-		status = Signal(sSvrName, nSID, *m_pMobSignalMember, &mobArg, 1, 0, flags);
+		status = Signal(sSvrName, sessionId, *m_pMobSignalMember, &mobArg, 1, 0, flags);
 
 		delete[] pBuf;
 	}

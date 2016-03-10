@@ -114,7 +114,7 @@ void CALLBACK fnMissingCheck(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWO
 	gpMob->MissingCheck();
 }
 
-void CSender::Save(SessionId nSID, const char * pJoiner, char * sText, int nLength, const char * pExtra, int nExtLen)
+void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen)
 {
 	RECEIVE rcv;
 	std::string p;
@@ -130,11 +130,11 @@ void CSender::Save(SessionId nSID, const char * pJoiner, char * sText, int nLeng
 	rcv.snum = pSD->snum;
 	rcv.auto_inc_start = pSD->auto_inc;
 	rcv.auto_inc_end = pSD->auto_inc;
-	rcv.data = sText;
+	rcv.data.assign(pText->z, pText->nUsed);
 
 	while ((start_pos = rcv.data.find("file://", start_pos)) != std::string::npos) {
 		if ((end_pos = rcv.data.find("\'", start_pos)) != std::string::npos) {
-			p.assign(GetLocalPath(nSID, pJoiner, rcv.data.substr(start_pos, end_pos - start_pos).data()));
+			p.assign(GetLocalPath(sessionId, pJoiner, rcv.data.substr(start_pos, end_pos - start_pos).data()));
 			rcv.data.replace(start_pos, end_pos - start_pos, p);
 			start_pos += p.length();
 		}
@@ -152,7 +152,7 @@ void CSender::Save(SessionId nSID, const char * pJoiner, char * sText, int nLeng
 		}
 	}
 
-	Apply(nSID);
+	Apply(sessionId);
 }
 
 BOOL CSender::PushApply(vApplies & applies, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst)
@@ -181,7 +181,7 @@ int mob_get_db(unsigned int sid, int num, const char * sTable, SYNC_DATA * pSD)
 	return 0;
 }
 
-void CSender::Apply(SessionId nSID)
+void CSender::Apply(SessionId sessionId)
 {
 	BOOL bFirst;
 	int num, n;
@@ -198,10 +198,10 @@ void CSender::Apply(SessionId nSID)
 		vApplies applies;
 
 		for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
-			if (!(*vRcvIt).data.empty() && (n = mob_find_parent_db(nSID, (*vRcvIt).joiner_prev.data(), (*vRcvIt).snum_prev, mRcvIt->first.data())) > num) num = n;
+			if (!(*vRcvIt).data.empty() && (n = mob_find_parent_db(sessionId, (*vRcvIt).joiner_prev.data(), (*vRcvIt).snum_prev, mRcvIt->first.data())) > num) num = n;
 		}
 
-		while ((num = mob_get_db(nSID, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, mRcvIt->first.data(), sd.joiner_prev, sd.snum_prev, TRUE);
+		while ((num = mob_get_db(sessionId, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, mRcvIt->first.data(), sd.joiner_prev, sd.snum_prev, TRUE);
 
 		bFirst = TRUE;
 
@@ -290,16 +290,16 @@ void CSender::MissingCheck()
 	}
 }
 
-const char * CSender::GetLocalPath(SessionId nSID, const char * pJoiner, const char * sURI)
+const char * CSender::GetLocalPath(SessionId sessionId, const char * pJoiner, const char * sURI)
 {
 	vRecvFiles::iterator itFiles;
 
-	if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(nSID, pJoiner, sURI))) != gRecvFiles.end())
+	if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, sURI))) != gRecvFiles.end())
 		return (*itFiles).path.data();
 	else return NULL;
 }
 
-void CSender::MissingCheck(const char * sUID, int nSNum)
+void CSender::MissingCheck(const char * sJoiner, int nSNum)
 {
 	mReceives::iterator miter;
 	vReceives::iterator viter;
@@ -307,13 +307,13 @@ void CSender::MissingCheck(const char * sUID, int nSNum)
 
 	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
 		for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
-			if (!((*viter).auto_inc_start <= nSNum && (*viter).auto_inc_end >= nSNum && (*viter).joiner == sUID)) {
-				m_pMob->SendData(sUID, time(NULL), ACT_MISSING, m_pMob->GetSessionID(), s.data(), s.size());
+			if (!((*viter).auto_inc_start <= nSNum && (*viter).auto_inc_end >= nSNum && (*viter).joiner == sJoiner)) {
+				m_pMob->SendData(sJoiner, time(NULL), ACT_MISSING, m_pMob->GetSessionID(), s.data(), s.size());
 				return;
 			}
 		}
 	}
-	m_pMob->SendData(sUID, time(NULL), ACT_NO_MISSED, m_pMob->GetSessionID(), s.data(), s.size());
+	m_pMob->SendData(sJoiner, time(NULL), ACT_NO_MISSED, m_pMob->GetSessionID(), s.data(), s.size());
 }
 
 void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg)
@@ -335,6 +335,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 
 		train[pTH->chain].action = pTH->action;
 		train[pTH->chain].footprint = pTH->footprint;
+		blkInit(&(train[pTH->chain].body));
 		memcpy(train[pTH->chain].extra, pTH->extra, TRAIN_EXTRA_LEN);
 	}
 	else if ((iter = train.find(((int*)data)[0])) != train.end()){
@@ -366,7 +367,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 				printf("%s: %ssqlite>", msg->GetSender(), iter->second.body);
 				TRAIN & cargo = m_mStation[pJoiner][iter->second.footprint];
 				cargo.action = iter->second.action;
-				memcpy(cargo.body.z, iter->second.body.z, iter->second.body.nUsed);
+				blkMove(&(cargo.body), &(iter->second.body));
 				memcpy(cargo.extra, iter->second.extra, TRAIN_EXTRA_LEN);
 				break;
 			}
@@ -433,7 +434,8 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 				std::map<int, TRAIN>::iterator _iter;
 
 				if ((_iter = m_mStation[pJoiner].find(iter->second.footprint)) != m_mStation[pJoiner].end()){
-					Save(sessionId, msg->GetSender(), _iter->second.body.z, _iter->second.body.nUsed, _iter->second.extra, TRAIN_EXTRA_LEN);
+					Save(sessionId, msg->GetSender(), &(_iter->second.body), _iter->second.extra, TRAIN_EXTRA_LEN);
+					blkFree(&(_iter->second.body));
 					m_mStation[pJoiner].erase(_iter);
 				}
 				break;

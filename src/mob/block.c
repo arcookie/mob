@@ -88,3 +88,10 @@ int mem2mem(Block *p, const char * z, int n)
 	}
 	return !!p->z;
 }
+
+void blkMove(Block * b, Block * a)
+{
+	b->z = a->z;
+	b->nAlloc = a->nAlloc;
+	b->nUsed = a->nUsed;
+}
