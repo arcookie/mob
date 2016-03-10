@@ -101,8 +101,6 @@ typedef struct {
 	qcc::String joiner;
 } FILE_RECV_ITEM;
 
-typedef std::vector<FILE_RECV_ITEM>		vRecvFiles;
-
 typedef struct {
 	int snum;
 	int snum_prev;
@@ -144,6 +142,7 @@ typedef std::vector<APPLIES>				vApplies;
 typedef std::map<qcc::String, vApplies>		mApplies;
 typedef std::vector<RECEIVE>				vReceives;
 typedef std::map<qcc::String, vReceives>	mReceives;
+typedef std::vector<FILE_RECV_ITEM>			vRecvFiles;
 
 class CAlljoynMob;
 
