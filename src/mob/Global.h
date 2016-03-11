@@ -27,6 +27,7 @@
 #ifndef _GLOBAL_H_
 #define _GLOBAL_H_
 
+#include "mob.h"
 #include "qcc/String.h"
 #include "sqlite3.h"
 
@@ -81,6 +82,7 @@ class CAlljoynMob;
 extern HANDLE gMutex;
 extern qcc::String gWPath;
 extern CAlljoynMob * gpMob;
+extern MobReceiveProc fnReceiveProc;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // global functions

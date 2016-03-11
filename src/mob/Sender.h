@@ -107,8 +107,7 @@ typedef struct {
 	int snum;
 	int auto_inc;
 	qcc::String joiner;
-	qcc::String base_table;
-	const char * data;
+	std::string data;
 } APPLY;
 
 struct CompareAPPLY
@@ -146,7 +145,7 @@ public:
 	QStatus _Send(SessionId sessionId, const char * sSvrName, int nChain, const char * pData, int nLength);
 
 	void Apply(SessionId sessionId);
-	BOOL PushApply(vApplies & applies, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst);
+	BOOL PushApply(vApplies & applies, APPLY & apply, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst);
 	QStatus SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, LPCSTR sPath);
 	QStatus SendData(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 

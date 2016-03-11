@@ -19,6 +19,8 @@
 
 #define NAME_PREFIX	"org.alljoyn.bus.arcookie.mob."
 
+typedef void(*MobReceiveProc)(sqlite3 * pDb);
+
 /*
 ** Make sure we can call this stuff from C++.
 */
@@ -35,6 +37,8 @@ extern "C" {
 	extern int mob_sync_db(sqlite3 * pDb);
 	extern void mob_close_db(sqlite3 * pDb);
 	extern sqlite3 * mob_open_db(const char * sPath);
+
+	extern void mob_receive_proc(MobReceiveProc fn);
 
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */

@@ -69,17 +69,10 @@ int strPrintf(Block *p, const char *zFormat, ...)
 */
 int mem2mem(Block *p, const char * z, int n)
 {
-	int nNew;
 	for (;;){
-		if (p->z){
-			if (p->nUsed + n < p->nAlloc - 1) memcpy(p->z + p->nUsed, z, n);
-			else nNew = n;
-		}
-		else{
-			nNew = p->nAlloc;
-		}
-		if (p->nUsed + nNew < p->nAlloc - 1){
-			p->nUsed += nNew;
+		if (p->z && p->nUsed + n < p->nAlloc - 1) {
+			memcpy(p->z + p->nUsed, z, n);
+			p->nUsed += n;
 			break;
 		}
 		p->nAlloc = p->nAlloc * 2 + 1000;

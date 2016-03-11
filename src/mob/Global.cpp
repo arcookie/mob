@@ -35,6 +35,7 @@
 qcc::String gWPath;
 HANDLE gMutex = NULL;
 CAlljoynMob * gpMob = NULL;
+MobReceiveProc fnReceiveProc = NULL;
 
 const qcc::String get_unique_path(const char * sExt)
 {

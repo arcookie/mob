@@ -118,7 +118,7 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 {
 	RECEIVE rcv;
 	std::string p;
-	size_t start_pos;
+	size_t start_pos = 0;
 	size_t end_pos;
 	mReceives::iterator miter;
 	vReceives::iterator viter;
@@ -155,9 +155,8 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 	Apply(sessionId);
 }
 
-BOOL CSender::PushApply(vApplies & applies, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst)
+BOOL CSender::PushApply(vApplies & applies, APPLY & apply, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst)
 {
-	APPLY apply;
 	vApplies::iterator viter;
 
 	if ((viter = std::find_if(applies.begin(), applies.end(), find_id_applies(sJoinerPrev, nSNumPrev))) != applies.end()) (*viter).applies.insert(apply);
@@ -183,32 +182,49 @@ int mob_get_db(unsigned int sid, int num, const char * sTable, SYNC_DATA * pSD)
 
 void CSender::Apply(SessionId sessionId)
 {
+	BOOL bDone = FALSE;
 	BOOL bFirst;
 	int num, n;
 	BOOL bWorked;
 	APPLY apply;
 	SYNC_DATA sd;
+	sqlite3 * pMainDb = m_pMob->GetMainDB();
+	sqlite3 * pBackDb = m_pMob->GetBackDB();
+	sqlite3 * pUndoDb = m_pMob->GetUndoDB();
 	sApplies::iterator siter;
 	mApplies::iterator miter;
 	vApplies::iterator viter;
 	mReceives::iterator mRcvIt;
 	vReceives::iterator vRcvIt;
 
+	sqlite3_stmt *pStmt = db_prepare(pMainDb, "SELECT name FROM main.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' UNION\n"
+		"SELECT name FROM aux.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' ORDER BY name");
+
+	while (SQLITE_ROW == sqlite3_step(pStmt));
+
+	sqlite3_finalize(pStmt);
+
 	for (mRcvIt = m_mReceives.begin(); mRcvIt != m_mReceives.end(); mRcvIt++) {
 		vApplies applies;
-
+		
 		for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
 			if (!(*vRcvIt).data.empty() && (n = mob_find_parent_db(sessionId, (*vRcvIt).joiner_prev.data(), (*vRcvIt).snum_prev, mRcvIt->first.data())) > num) num = n;
 		}
 
-		while ((num = mob_get_db(sessionId, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, mRcvIt->first.data(), sd.joiner_prev, sd.snum_prev, TRUE);
-
+		while ((num = mob_get_db(sessionId, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, apply, mRcvIt->first.data(), sd.joiner_prev, sd.snum_prev, TRUE);
+		
 		bFirst = TRUE;
 
 		do {
 			bWorked = FALSE;
 			for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
-				if (!(*vRcvIt).data.empty() && PushApply(applies, mRcvIt->first.data(), (*vRcvIt).joiner_prev.data(), (*vRcvIt).snum_prev, bFirst)) {
+
+				apply.snum = (*vRcvIt).snum;
+				apply.auto_inc = (*vRcvIt).auto_inc_end;
+				apply.joiner = (*vRcvIt).joiner;
+				apply.data = (*vRcvIt).data;
+
+				if (!(*vRcvIt).data.empty() && PushApply(applies, apply, mRcvIt->first.data(), (*vRcvIt).joiner_prev.data(), (*vRcvIt).snum_prev, bFirst)) {
 					bFirst = FALSE;
 					(*vRcvIt).data.clear();
 
@@ -233,32 +249,36 @@ void CSender::Apply(SessionId sessionId)
 			sqlite3_stmt *pStmt2 = NULL;
 			sqlite3_stmt *pStmt3 = NULL;
 
-			QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt2, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*viter).joiner_prev.data(), (*viter).snum_prev, mRcvIt->first.data()),
+			blkInit(&undo);
+
+			QUERY_SQL_V(pUndoDb, pStmt2, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*viter).joiner_prev.data(), (*viter).snum_prev, mRcvIt->first.data()),
 				int num = sqlite3_column_int(pStmt2, 0);
 
-				QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt3, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", num, mRcvIt->first.data()),
-					sqlite3_exec(m_pMob->GetMainDB(), (const char *)sqlite3_column_text(pStmt3, 0), 0, 0, 0);
+				QUERY_SQL_V(pUndoDb, pStmt3, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", num, mRcvIt->first.data()),
+					sqlite3_exec(pMainDb, (const char *)sqlite3_column_text(pStmt3, 0), 0, 0, 0);
 				);
-				EXECUTE_SQL_V(m_pMob->GetMainDB(), ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", num, mRcvIt->first.data()));
+				EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", num, mRcvIt->first.data()));
 				break;
 			);
 
-			for (; viter != applies.end(); viter++) {
+			for (viter = applies.begin(); viter != applies.end(); viter++) {
 				for (siter = (*viter).applies.begin(); siter != (*viter).applies.end(); siter++) {
-
-					blkInit(&undo);
-
-					sqlite3_exec(m_pMob->GetMainDB(), (*siter).data, 0, 0, 0);
-					diff_one_table(m_pMob->GetMainDB(), "main", "aux", mRcvIt->first.data(), &undo);
-					sqlite3_exec(m_pMob->GetBackDB(), (*siter).data, 0, 0, 0);
-					EXECUTE_SQL_V(m_pMob->GetUndoDB(), ("INSERT INTO works (joiner, auto_inc, snum, base_table, undo, redo) VALUES (%Q, %d, %d, %Q, %Q, %Q);", (*siter).joiner.data(), (*siter).auto_inc, (*siter).snum, mRcvIt->first.data(), undo.z, (*siter).data));
-
-					blkFree(&undo);
-
-					delete (*siter).data;
+					sqlite3_exec(pMainDb, (*siter).data.data(), 0, 0, 0);
+					bDone = TRUE;
 				}
 			}
+
+			diff_one_table(pMainDb, "main", "aux", mRcvIt->first.data(), &undo);
+
+			for (viter = applies.begin(); viter != applies.end(); viter++) {
+				for (siter = (*viter).applies.begin(); siter != (*viter).applies.end(); siter++) {
+					sqlite3_exec(pBackDb, (*siter).data.data(), 0, 0, 0);
+					EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, auto_inc, snum, base_table, undo, redo) VALUES (%Q, %d, %d, %Q, %Q, %Q);", (*siter).joiner.data(), (*siter).auto_inc, (*siter).snum, mRcvIt->first.data(), undo.z, (*siter).data.data()));
+				}
+			}
+			blkFree(&undo);
 		}
+		if (bDone && fnReceiveProc) fnReceiveProc(pMainDb);
 	}
 }
 
@@ -324,7 +344,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 	const char * pJoiner = msg->GetSender();
 	uint8_t * data;
 	size_t size;
-	std::map<int, TRAIN>::iterator iter;
+	mTrain::iterator iter;
 	mTrain & train = m_mTrain[pJoiner];
 	SessionId sessionId = m_pMob->GetSessionID();
 
@@ -333,10 +353,19 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 	if (IS_TRAIN_HEADER(data) && size == sizeof(TRAIN_HEADER)) {
 		TRAIN_HEADER * pTH = (TRAIN_HEADER *)data;
 
-		train[pTH->chain].action = pTH->action;
-		train[pTH->chain].footprint = pTH->footprint;
-		blkInit(&(train[pTH->chain].body));
-		memcpy(train[pTH->chain].extra, pTH->extra, TRAIN_EXTRA_LEN);
+		if (pTH->action == ACT_END) {
+			if ((iter = m_mStation[pJoiner].find(pTH->footprint)) != m_mStation[pJoiner].end()){
+				Save(sessionId, msg->GetSender(), &(iter->second.body), iter->second.extra, TRAIN_EXTRA_LEN);
+				blkFree(&(iter->second.body));
+				m_mStation[pJoiner].erase(iter);
+			}
+		}
+		else {
+			train[pTH->chain].action = pTH->action;
+			train[pTH->chain].footprint = pTH->footprint;
+			blkInit(&(train[pTH->chain].body));
+			memcpy(train[pTH->chain].extra, pTH->extra, TRAIN_EXTRA_LEN);
+		}
 	}
 	else if ((iter = train.find(((int*)data)[0])) != train.end()){
 		if (size == sizeof(int)) {
@@ -426,17 +455,6 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 					fri.path = mem2file(iter->second.body.z, iter->second.body.nUsed, fri.uri.substr(fri.uri.find_last_of('.')).data());
 
 					gRecvFiles.push_back(fri);
-				}
-				break;
-			}
-			case ACT_END:
-			{
-				std::map<int, TRAIN>::iterator _iter;
-
-				if ((_iter = m_mStation[pJoiner].find(iter->second.footprint)) != m_mStation[pJoiner].end()){
-					Save(sessionId, msg->GetSender(), &(_iter->second.body), _iter->second.extra, TRAIN_EXTRA_LEN);
-					blkFree(&(_iter->second.body));
-					m_mStation[pJoiner].erase(_iter);
 				}
 				break;
 			}

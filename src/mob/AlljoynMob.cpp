@@ -24,6 +24,7 @@
 *   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#include <Shlwapi.h>
 #include "mob.h"
 #include "Global.h"
 #include "MobClient.h"
@@ -78,9 +79,11 @@ sqlite3 * CAlljoynMob::OpenDB(const char *zFilename)
 	if (sqlite3_open(zFilename, &m_pMainDB) == SQLITE_OK) {
 		qcc::String b_path = get_unique_path(".db3");
 
+		sqlite3_exec(m_pMainDB, "PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+
 		if (sqlite3_open(b_path.data(), &m_pBackDB) == SQLITE_OK) {
 			sqlite3_exec(m_pBackDB, "PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
-			EXECUTE_SQL_V(m_pMainDB, ("PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;ATTACH %Q as aux;", b_path.data()));
+			EXECUTE_SQL_V(m_pMainDB, ("ATTACH %Q as aux;", b_path.data()));
 		}
 		if (sqlite3_open(get_unique_path(".db3").data(), &m_pUndoDB) == SQLITE_OK)
 			sqlite3_exec(m_pUndoDB, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, joiner CHAR(16), auto_inc INT DEFAULT 1, snum INT DEFAULT 1, base_table VARCHAR(64), undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);

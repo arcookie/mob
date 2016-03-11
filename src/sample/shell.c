@@ -4614,6 +4614,14 @@ static int alljoyn_init(int argc, char** argv)
 	return ret;
 }
 
+void ReceiveProc(sqlite3 * pDb)
+{
+	int i = 0;
+
+	i = i;
+
+}
+
 int SQLITE_CDECL main(int argc, char **argv){
   ShellState data;
   const char *zInitFile = 0;
@@ -4624,6 +4632,8 @@ int SQLITE_CDECL main(int argc, char **argv){
 	  utf8_printf(stderr, "Error occured in mob_init().\n");
 	  exit(1);
   }
+
+  mob_receive_proc(&ReceiveProc);
 
 #if USE_SYSTEM_SQLITE+0!=1
   if( strcmp(sqlite3_sourceid(),SQLITE_SOURCE_ID)!=0 ){

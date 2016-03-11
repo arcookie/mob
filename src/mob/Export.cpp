@@ -100,22 +100,29 @@ int mob_sync_db(sqlite3 * pDb)
 	int session_id = gpMob->GetSessionID();
 	sqlite3 * pBackDb = gpMob->GetBackDB();
 	sqlite3 * pUndoDb = gpMob->GetUndoDB();
+	std::vector<qcc::String> tables;
+	std::vector<qcc::String> sqls;
+	std::vector<qcc::String>::const_iterator iter;
 	sqlite3_stmt *pStmt = db_prepare(pDb, "SELECT name FROM main.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' UNION\n"
 		"SELECT name FROM aux.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' ORDER BY name");
+
+	while (SQLITE_ROW == sqlite3_step(pStmt)) tables.push_back((const char*)sqlite3_column_text(pStmt, 0));
+
+	sqlite3_finalize(pStmt);
 
 	strcpy_s(sd.joiner, sizeof(sd.joiner), gpMob->GetJoinName());
 	strcpy_s(sd.joiner_prev, sizeof(sd.joiner_prev), sd.joiner);
 
-	while (SQLITE_ROW == sqlite3_step(pStmt)){
-		strcpy_s(sd.base_table, sizeof(sd.base_table), (const char*)sqlite3_column_text(pStmt, 0));
+	for (iter = tables.begin(); iter != tables.end(); iter++) {
+		strcpy_s(sd.base_table, sizeof(sd.base_table), (*iter).data());
 		diff_one_table(pDb, "main", "aux", sd.base_table, &undo);
 
 		if (undo.z){
 			sd.snum_prev = -1;
 			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT joiner, snum FROM works WHERE base_table = %Q ORDER BY num DESC LIMIT 1;", sd.base_table),
 				strcpy_s(sd.joiner_prev, sizeof(sd.joiner_prev), (const char *)sqlite3_column_text(pStmt, 0));
-			sd.snum_prev = sqlite3_column_int(pStmt, 1);
-			break;
+				sd.snum_prev = sqlite3_column_int(pStmt, 1);
+				break;
 			);
 
 			sd.auto_inc = 1;
@@ -124,10 +131,11 @@ int mob_sync_db(sqlite3 * pDb)
 			sd.snum = 1;
 			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT (MAX(snum) + 1) AS sn FROM works WHERE joiner = %Q AND base_table = %Q;", sd.joiner, sd.base_table), sd.snum = sqlite3_column_int(pStmt, 0); break;);
 
-			diff_one_table(pDb, "aux", "main", sd.base_table, &redo);
+			diff_one_table(pDb, "aux", "main", (*iter).data(), &redo);
+
 			sqlite3_exec(pBackDb, redo.z, 0, 0, 0);
 
-			EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, auto_inc, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", sd.joiner, sd.auto_inc, sd.snum, sd.base_table, undo.z, redo.z));
+			EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, auto_inc, snum, base_table, undo, redo) VALUES (%Q, %d, %d, %Q, %Q, %Q);", sd.joiner, sd.auto_inc, sd.snum, (*iter).data(), undo.z, redo.z));
 
 			alljoyn_send(session_id, NULL, ACT_DATA, redo.z, redo.nUsed, (const char *)&sd, sizeof(SYNC_DATA));
 
@@ -135,7 +143,6 @@ int mob_sync_db(sqlite3 * pDb)
 			blkFree(&undo);
 		}
 	}
-	sqlite3_finalize(pStmt);
 
 	blkFree(&redo);
 	blkFree(&undo);
@@ -143,3 +150,7 @@ int mob_sync_db(sqlite3 * pDb)
 	return 0;
 }
 
+void mob_receive_proc(MobReceiveProc fn)
+{
+	fnReceiveProc = fn;
+}
