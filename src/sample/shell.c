@@ -4730,9 +4730,7 @@ int SQLITE_CDECL main(int argc, char **argv){
   }
 
   set_table_name(&data, 0);
-  if( data.db ){
-	  mob_close_db(data.db);
-  }
+
   sqlite3_free(data.zFreeOnClose); 
 
   mob_disconnect();
