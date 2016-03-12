@@ -35,7 +35,7 @@
 
 using namespace ajn;
 
-#define SEND_BUF		(8192 - sizeof(int) * 2)
+#define SEND_BUF		(8192 - sizeof(int))
 
 #define TRAIN_MARK_1	0x34533454
 #define TRAIN_MARK_2	0x34531454
@@ -76,12 +76,12 @@ typedef struct {
 	char extra[TRAIN_EXTRA_LEN];
 } TRAIN_HEADER;
 
-typedef struct TRAIN {
+typedef struct {
 	int footprint;  // 
 	int action; // 0 data, 1 file list 2 file list req 3 file
 	char extra[TRAIN_EXTRA_LEN];
 	Block body;
-};
+} TRAIN;
 
 typedef struct {
 	int session_id;
@@ -128,11 +128,10 @@ typedef struct {
 
 typedef std::map<int, TRAIN>				mTrain;
 typedef std::map<qcc::String, mTrain>		mTrains;
-typedef std::vector<APPLIES>				vApplies;
-typedef std::map<qcc::String, vApplies>		mApplies;
-typedef std::vector<RECEIVE>				vReceives;
+typedef std::vector<APPLIES*>				vApplies;
+typedef std::vector<RECEIVE*>				vReceives;
 typedef std::map<qcc::String, vReceives>	mReceives;
-typedef std::vector<FILE_RECV_ITEM>			vRecvFiles;
+typedef std::vector<FILE_RECV_ITEM*>		vRecvFiles;
 
 class CAlljoynMob;
 
@@ -140,6 +139,7 @@ class CSender : public BusObject {
 public:
 
 	CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* sPath);
+	~CSender();
 
 	QStatus _Send(SessionId sessionId, const char * sSvrName, int nChain, const char * pData, int nLength);
 
@@ -152,6 +152,7 @@ public:
 	void MissingCheck(const char * sJoiner, int nSNum);
 	const char * GetLocalPath(SessionId sessionId, const char * pJoiner, const char * sURI);
 	void Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen);
+	void OnEnd(int footprint, const char * pJoiner);
 	void OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg);
 
 	virtual void GetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}

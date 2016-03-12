@@ -185,7 +185,7 @@ int alljoyn_send(unsigned int nSID, const char * pJoiner, int nAction, char * sT
 		}
 		if (data.nUsed > 0) {
 			ret = gpMob->SendData(pJoiner, footprint, ACT_FLIST, nSID, data.z, data.nUsed);
-			SetTimer(NULL, TM_SEND_SIGNAL, INT_SEND_SIGNAL, &fnSendSignal);
+		//	SetTimer(NULL, TM_SEND_SIGNAL, INT_SEND_SIGNAL, &fnSendSignal);
 		}
 		else gpMob->SendData(pJoiner, footprint, ACT_END, nSID, 0, 0);
 
