@@ -25,6 +25,7 @@
 */
 #include <time.h>
 #include <ShlObj.h>
+#include <Shlwapi.h>
 #include <alljoyn/Init.h>
 
 #include "qcc/StringUtil.h"
@@ -161,18 +162,19 @@ int alljoyn_send(unsigned int nSID, const char * pJoiner, int nAction, char * sT
 		char * p = sText;
 		Block data;
 		char * p2;
+		qcc::String path;
 		FILE_SEND_ITEM fsi;
 
 		blkInit(&data);
 
 		while ((p = strstr(p, "file://")) != NULL) {
-			p += 7;
 			if ((p2 = strchr(p, '\'')) != NULL && (l = (p2 - p)) > 0) {
-				if (l < MAX_URI) {
+				if (l < MAX_PATH) {
 					memcpy(fsi.uri, p, l);
 					fsi.uri[l] = 0;
-					fsi.mtime = get_file_mtime(fsi.uri);
-					fsi.fsize = get_file_length(fsi.uri);
+					path = get_path(fsi.uri);
+					fsi.mtime = get_file_mtime(path.data());
+					fsi.fsize = get_file_length(path.data());
 
 					mem2mem(&data, (char *)&fsi, sizeof(FILE_SEND_ITEM));
 				}
@@ -191,4 +193,24 @@ int alljoyn_send(unsigned int nSID, const char * pJoiner, int nAction, char * sT
 	}
 
 	return ret;
+}
+
+qcc::String get_uri(const char * path)
+{
+	TCHAR output[MAX_PATH]; // allocate buffer in memory (stack)
+	DWORD dwDisp = MAX_PATH; // max posible buffer size
+	LPDWORD lpdwDisp = &dwDisp;
+	HRESULT res2 = UrlCreateFromPath(path, output, lpdwDisp, NULL);
+
+	return output;
+}
+
+qcc::String get_path(const char * uri)
+{
+	TCHAR output[MAX_PATH]; // allocate buffer in memory (stack)
+	DWORD dwDisp = MAX_PATH; // max posible buffer size
+	LPDWORD lpdwDisp = &dwDisp;
+	HRESULT res2 = PathCreateFromUrl(uri, output, lpdwDisp, NULL);
+
+	return output;
 }

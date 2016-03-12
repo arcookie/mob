@@ -90,6 +90,8 @@ extern MobReceiveProc fnReceiveProc;
 extern qcc::String get_writable_path();
 extern void remove_dir(qcc::String sPath);
 extern int get_file_mtime(const char * sPath);
+extern qcc::String get_uri(const char * path);
+extern qcc::String get_path(const char * uri);
 extern long get_file_length(const char * sPath);
 extern const qcc::String get_unique_path(const char * sExt);
 extern const qcc::String mem2file(const char * data, int length, const char * sExt);

@@ -69,17 +69,16 @@ struct find_uri : std::unary_function<FILE_RECV_ITEM, bool> {
 	}
 };
 
-QStatus CSender::SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, LPCSTR sPath)
+QStatus CSender::SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, FILE_SEND_ITEM * pFSI)
 {
 	FILE *fp;
 	QStatus status = ER_OK;
 
-	if ((fp = fopen(sPath, "rb")) != NULL) {
+	if ((fp = fopen(get_path(pFSI->uri).data(), "rb")) != NULL) {
 		int l;
 		BYTE Buf[SEND_BUF];
 		TRAIN_HEADER th;
 		uint8_t flags = 0;
-		FILE_SEND_ITEM fsi;
 
 		TRAIN_HEADER(th.marks);
 
@@ -87,11 +86,7 @@ QStatus CSender::SendFile(const char * sJoiner, int nFootPrint, int nAction, Ses
 		th.action = nAction;
 		th.chain = time(NULL);
 
-		fsi.fsize = get_file_length(sPath);
-		fsi.mtime = get_file_mtime(sPath);
-		memcpy(fsi.uri, sPath, strlen(sPath));
-
-		memcpy(th.extra, (const char *)&fsi, sizeof(FILE_SEND_ITEM));
+		memcpy(th.extra, (const char *)pFSI, sizeof(FILE_SEND_ITEM));
 
 		MsgArg mobArg("ay", sizeof(TRAIN_HEADER), &th);
 
@@ -207,11 +202,11 @@ void CSender::Apply(SessionId sessionId)
 	for (mRcvIt = m_mReceives.begin(); mRcvIt != m_mReceives.end(); mRcvIt++) {
 		vApplies applies;
 		
-		for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
-			if (!(*vRcvIt).data.empty() && (n = mob_find_parent_db(sessionId, (*vRcvIt).joiner_prev.data(), (*vRcvIt).snum_prev, mRcvIt->first.data())) > num) num = n;
-		}
+		//for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
+		//	if (!(*vRcvIt).data.empty() && (n = mob_find_parent_db(sessionId, (*vRcvIt).joiner_prev.data(), (*vRcvIt).snum_prev, mRcvIt->first.data())) > num) num = n;
+		//}
 
-		while ((num = mob_get_db(sessionId, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, apply, mRcvIt->first.data(), sd.joiner_prev, sd.snum_prev, TRUE);
+		//while ((num = mob_get_db(sessionId, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, apply, mRcvIt->first.data(), sd.joiner_prev, sd.snum_prev, TRUE);
 		
 		bFirst = TRUE;
 
@@ -429,7 +424,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 					FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body.z;
 
 					while (n < iter->second.body.nUsed) {
-						SendFile(msg->GetSender(), iter->second.footprint, ACT_FILE, sessionId, pFSI->uri);
+						SendFile(msg->GetSender(), iter->second.footprint, ACT_FILE, sessionId, pFSI);
 						n += sizeof(FILE_SEND_ITEM);
 						pFSI++;
 					}

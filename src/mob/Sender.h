@@ -36,7 +36,6 @@
 using namespace ajn;
 
 #define SEND_BUF		(8192 - sizeof(int) * 2)
-#define MAX_URI	1024
 
 #define TRAIN_MARK_1	0x34533454
 #define TRAIN_MARK_2	0x34531454
@@ -46,7 +45,7 @@ using namespace ajn;
 #define TRAIN_MARK_6	0x32533414
 #define TRAIN_MARK_END	6
 
-#define TRAIN_EXTRA_LEN	128
+#define TRAIN_EXTRA_LEN	sizeof(FILE_SEND_ITEM)
 
 #define TRAIN_HEADER(a)	int __o__[TRAIN_MARK_END] = {TRAIN_MARK_1,TRAIN_MARK_2,TRAIN_MARK_3,TRAIN_MARK_4,TRAIN_MARK_5,TRAIN_MARK_6,}; memcpy((char *)(a), (char *)__o__, sizeof(__o__));
 
@@ -64,6 +63,12 @@ using namespace ajn;
 #define INT_SEND_SIGNAL		5000
 
 typedef struct {
+	char uri[MAX_PATH];
+	int mtime;
+	long fsize;
+} FILE_SEND_ITEM;
+
+typedef struct {
 	int marks[TRAIN_MARK_END];
 	int footprint;  // 
 	int action; // 0 data, 1 file list 2 file list req 3 file
@@ -77,12 +82,6 @@ typedef struct TRAIN {
 	char extra[TRAIN_EXTRA_LEN];
 	Block body;
 };
-
-typedef struct {
-	char uri[MAX_URI];
-	int mtime;
-	long fsize;
-} FILE_SEND_ITEM;
 
 typedef struct {
 	int session_id;
@@ -146,7 +145,7 @@ public:
 
 	void Apply(SessionId sessionId);
 	BOOL PushApply(vApplies & applies, APPLY & apply, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst);
-	QStatus SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, LPCSTR sPath);
+	QStatus SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, FILE_SEND_ITEM * pFSI);
 	QStatus SendData(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
 	void MissingCheck();
