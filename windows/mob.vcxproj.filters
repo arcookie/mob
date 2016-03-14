@@ -45,6 +45,12 @@
     <ClCompile Include="..\src\mob\block.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\mob\Applier.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\mob\MissingCheck.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\mob\AlljoynMob.h">

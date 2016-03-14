@@ -85,9 +85,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\mob\AlljoynMob.cpp" />
+    <ClCompile Include="..\src\mob\Applier.cpp" />
     <ClCompile Include="..\src\mob\block.c" />
     <ClCompile Include="..\src\mob\Export.cpp" />
     <ClCompile Include="..\src\mob\Global.cpp" />
+    <ClCompile Include="..\src\mob\MissingCheck.cpp" />
     <ClCompile Include="..\src\mob\MobBusListener.cpp" />
     <ClCompile Include="..\src\mob\MobClient.cpp" />
     <ClCompile Include="..\src\mob\MobServer.cpp" />

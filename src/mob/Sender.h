@@ -103,6 +103,15 @@ typedef struct {
 	std::string data;
 } RECEIVE;
 
+struct find_id : std::unary_function<RECEIVE*, bool> {
+	int snum;
+	qcc::String joiner;
+	find_id(qcc::String & u, int sn) :joiner(u), snum(sn) { }
+	bool operator()(RECEIVE const * m) const {
+		return (m->joiner == joiner && m->auto_inc_start <= snum && m->auto_inc_end >= snum);
+	}
+};
+
 typedef struct {
 	int snum;
 	int auto_inc;
@@ -151,7 +160,8 @@ public:
 
 	void MissingCheck();
 	void MissingCheck(const char * sJoiner, int nSNum);
-	qcc::String GetLocalPath(SessionId sessionId, const char * pJoiner, const char * sURI);
+	BOOL StartMissingCheck();
+
 	void Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen);
 	void OnEnd(int footprint, const char * pJoiner);
 	void OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg);

@@ -36,24 +36,6 @@
 
 vRecvFiles gRecvFiles;
 
-struct find_id : std::unary_function<RECEIVE*, bool> {
-	int snum;
-	qcc::String joiner;
-	find_id(qcc::String & u, int sn) :joiner(u), snum(sn) { }
-	bool operator()(RECEIVE const * m) const {
-		return (m->joiner == joiner && m->auto_inc_start <= snum && m->auto_inc_end >= snum);
-	}
-};
-
-struct find_id_applies : std::unary_function<RECEIVE*, bool> {
-	int snum_prev;
-	qcc::String joiner_prev;
-	find_id_applies(const char * u, int sn) :joiner_prev(u), snum_prev(sn) { }
-	bool operator()(APPLIES const * m) const {
-		return (m->joiner_prev == joiner_prev && m->snum_prev == snum_prev);
-	}
-};
-
 struct find_uri : std::unary_function<FILE_RECV_ITEM*, bool> {
 	int session_id;
 	qcc::String joiner;
@@ -118,21 +100,13 @@ QStatus CSender::SendFile(const char * sJoiner, int nFootPrint, int nAction, Ses
 	return status;
 }
 
-void CALLBACK fnMissingCheck(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWORD /*dwTime*/)
-{
-	KillTimer(NULL, idEvent);
-
-	gpMob->MissingCheck();
-}
-
 void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen)
 {
 	RECEIVE * pRCV = new RECEIVE;
 	qcc::String p;
 	size_t start_pos = 0;
 	size_t end_pos;
-	mReceives::iterator miter;
-	vReceives::iterator viter;
+	vRecvFiles::iterator itFiles;
 	SYNC_DATA * pSD = (SYNC_DATA *)pExtra;
 
 	pRCV->joiner_prev = pSD->joiner_prev;
@@ -145,8 +119,8 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 
 	while ((start_pos = pRCV->data.find("file://", start_pos)) != std::string::npos) {
 		if ((end_pos = pRCV->data.find("\'", start_pos)) != std::string::npos) {
-			p = GetLocalPath(sessionId, pJoiner, pRCV->data.substr(start_pos, end_pos - start_pos).data());
-			pRCV->data.replace(start_pos, end_pos - start_pos, get_uri(p.data()).data());
+			if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, pRCV->data.substr(start_pos, end_pos - start_pos).data()))) != gRecvFiles.end())
+				pRCV->data.replace(start_pos, end_pos - start_pos, get_uri((*itFiles)->path.data()).data());
 			start_pos += p.length();
 		}
 		else start_pos ++;
@@ -154,200 +128,7 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 
 	m_mReceives[pSD->base_table].push_back(pRCV);
 
-	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
-		for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
-			if ((*viter)->auto_inc_start != (*viter)->auto_inc_end && (*viter)->auto_inc_end > 1 && std::find_if(miter->second.begin(), miter->second.end(), find_id((*viter)->joiner, (*viter)->auto_inc_end - 1)) == miter->second.end()) {
-				SetTimer(NULL, TM_MISSING_CHECK, INT_MISSING_CHECK, &fnMissingCheck);
-				return;
-			}
-		}
-	}
-
-	Apply(sessionId);
-}
-
-BOOL CSender::PushApply(vApplies & applies, APPLY & apply, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst)
-{
-	vApplies::iterator viter;
-
-	if ((viter = std::find_if(applies.begin(), applies.end(), find_id_applies(sJoinerPrev, nSNumPrev))) != applies.end()) (*viter)->applies.insert(apply);
-	else if (bFirst) {
-		APPLIES * pAppl = new APPLIES;
-
-		pAppl->applies.insert(apply);
-		applies.push_back(pAppl);
-		bFirst = FALSE;
-	}
-	return TRUE;
-}
-
-int mob_find_parent_db(unsigned int sid, const char * joiner, int snum, const char * sTable)
-{
-	return 0;
-}
-
-int mob_get_db(unsigned int sid, int num, const char * sTable, SYNC_DATA * pSD)
-{
-	return 0;
-}
-
-void CSender::Apply(SessionId sessionId)
-{
-	BOOL bDone = FALSE;
-	BOOL bFirst;
-	int num, n;
-	BOOL bWorked;
-	APPLY apply;
-	SYNC_DATA sd;
-	sqlite3 * pMainDb = m_pMob->GetMainDB();
-	sqlite3 * pBackDb = m_pMob->GetBackDB();
-	sqlite3 * pUndoDb = m_pMob->GetUndoDB();
-	sApplies::iterator siter;
-	vApplies::iterator viter;
-	mReceives::iterator mRcvIt;
-	vReceives::iterator vRcvIt;
-
-	sqlite3_stmt *pStmt = db_prepare(pMainDb, "SELECT name FROM main.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' UNION\n"
-		"SELECT name FROM aux.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' ORDER BY name");
-
-	while (SQLITE_ROW == sqlite3_step(pStmt));
-
-	sqlite3_finalize(pStmt);
-
-	for (mRcvIt = m_mReceives.begin(); mRcvIt != m_mReceives.end(); mRcvIt++) {
-		vApplies applies;
-		
-		//for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
-		//	if (!(*vRcvIt)->data.empty() && (n = mob_find_parent_db(sessionId, (*vRcvIt)->joiner_prev.data(), (*vRcvIt)->snum_prev, mRcvIt->first.data())) > num) num = n;
-		//}
-
-		//while ((num = mob_get_db(sessionId, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, apply, mRcvIt->first.data(), sd.joiner_prev, sd.snum_prev, TRUE);
-		
-		bFirst = TRUE;
-
-		do {
-			bWorked = FALSE;
-			for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
-
-				apply.snum = (*vRcvIt)->snum;
-				apply.auto_inc = (*vRcvIt)->auto_inc_end;
-				apply.joiner = (*vRcvIt)->joiner;
-				apply.data = (*vRcvIt)->data;
-
-				if (!(*vRcvIt)->data.empty() && PushApply(applies, apply, mRcvIt->first.data(), (*vRcvIt)->joiner_prev.data(), (*vRcvIt)->snum_prev, bFirst)) {
-					bFirst = FALSE;
-					(*vRcvIt)->data.clear();
-
-					vReceives::iterator it = std::find_if(mRcvIt->second.begin(), mRcvIt->second.end(), find_id((*vRcvIt)->joiner, (*vRcvIt)->auto_inc_end - 1));
-
-					if (it != mRcvIt->second.end()) {
-						(*it)->auto_inc_end = (*vRcvIt)->auto_inc_end;
-						delete (*vRcvIt);
-						vRcvIt = mRcvIt->second.erase(vRcvIt);
-					}
-					else vRcvIt++;
-
-					bWorked = TRUE;
-				}
-				else vRcvIt++;
-			}
-		} while (bWorked);
-
-		vApplies::iterator viter = applies.begin();
-
-		if (viter != applies.end()) {
-			Block undo;
-			sqlite3_stmt *pStmt2 = NULL;
-			sqlite3_stmt *pStmt3 = NULL;
-
-			blkInit(&undo);
-
-			QUERY_SQL_V(pUndoDb, pStmt2, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*viter)->joiner_prev.data(), (*viter)->snum_prev, mRcvIt->first.data()),
-				int num = sqlite3_column_int(pStmt2, 0);
-
-				QUERY_SQL_V(pUndoDb, pStmt3, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", num, mRcvIt->first.data()),
-					sqlite3_exec(pMainDb, (const char *)sqlite3_column_text(pStmt3, 0), 0, 0, 0);
-				);
-				EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", num, mRcvIt->first.data()));
-				break;
-			);
-
-			for (viter = applies.begin(); viter != applies.end(); viter++) {
-				for (siter = (*viter)->applies.begin(); siter != (*viter)->applies.end(); siter++) {
-					sqlite3_exec(pMainDb, (*siter).data.data(), 0, 0, 0);
-					bDone = TRUE;
-				}
-			}
-
-			diff_one_table(pMainDb, "main", "aux", mRcvIt->first.data(), &undo);
-
-			for (viter = applies.begin(); viter != applies.end(); viter++) {
-				for (siter = (*viter)->applies.begin(); siter != (*viter)->applies.end(); siter++) {
-					sqlite3_exec(pBackDb, (*siter).data.data(), 0, 0, 0);
-					EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, auto_inc, snum, base_table, undo, redo) VALUES (%Q, %d, %d, %Q, %Q, %Q);", (*siter).joiner.data(), (*siter).auto_inc, (*siter).snum, mRcvIt->first.data(), undo.z, (*siter).data.data()));
-				}
-			}
-			blkFree(&undo);
-		}
-		for (viter = applies.begin(); viter != applies.end(); viter++) {
-			delete (*viter);
-		}
-		if (bDone && fnReceiveProc) fnReceiveProc(pMainDb);
-	}
-}
-
-void CSender::MissingCheck()
-{
-	std::map<qcc::String, qcc::String> miss;
-	{
-		qcc::String s;
-		mReceives::iterator miter;
-		vReceives::iterator viter;
-
-		for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
-			s = "";
-			for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
-				if ((*viter)->auto_inc_start != (*viter)->auto_inc_end && (*viter)->auto_inc_end > 1 && std::find_if(miter->second.begin(), miter->second.end(), find_id((*viter)->joiner, (*viter)->auto_inc_end - 1)) == miter->second.end()) {
-					if (s != "") s += ",";
-					s += qcc::I32ToString((*viter)->auto_inc_end - 1);
-				}
-			}
-			if (!s.empty()) miss[(*viter)->joiner] = s;
-		}
-	}
-	{
-		std::map<qcc::String, qcc::String>::iterator iter;
-
-		for (iter = miss.begin(); iter != miss.end(); iter++) {
-			if (!iter->second.empty()) m_pMob->SendData(iter->first.data(), time(NULL), ACT_MISSING, m_pMob->GetSessionID(), iter->second.data(), iter->second.size());
-		}
-	}
-}
-
-qcc::String CSender::GetLocalPath(SessionId sessionId, const char * pJoiner, const char * sURI)
-{
-	vRecvFiles::iterator itFiles;
-
-	if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, sURI))) != gRecvFiles.end())
-		return (*itFiles)->path;
-	else return "";
-}
-
-void CSender::MissingCheck(const char * sJoiner, int nSNum)
-{
-	mReceives::iterator miter;
-	vReceives::iterator viter;
-	qcc::String s = qcc::I32ToString(nSNum);
-
-	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
-		for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
-			if (!((*viter)->auto_inc_start <= nSNum && (*viter)->auto_inc_end >= nSNum && (*viter)->joiner == sJoiner)) {
-				m_pMob->SendData(sJoiner, time(NULL), ACT_MISSING, m_pMob->GetSessionID(), s.data(), s.size());
-				return;
-			}
-		}
-	}
-	m_pMob->SendData(sJoiner, time(NULL), ACT_NO_MISSED, m_pMob->GetSessionID(), s.data(), s.size());
+	if (!StartMissingCheck()) Apply(sessionId);
 }
 
 void CSender::OnEnd(int footprint, const char * pJoiner)
