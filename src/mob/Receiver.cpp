@@ -128,7 +128,7 @@ void CALLBACK fnMissingCheck(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWO
 void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen)
 {
 	RECEIVE * pRCV = new RECEIVE;
-	std::string p;
+	qcc::String p;
 	size_t start_pos = 0;
 	size_t end_pos;
 	mReceives::iterator miter;
@@ -143,14 +143,14 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 	pRCV->auto_inc_end = pSD->auto_inc;
 	pRCV->data.assign(pText->z, pText->nUsed);
 
-	//while ((start_pos = pRCV->data.find("file://", start_pos)) != std::string::npos) {
-	//	if ((end_pos = pRCV->data.find("\'", start_pos)) != std::string::npos) {
-	//		p.assign(GetLocalPath(sessionId, pJoiner, pRCV->data.substr(start_pos, end_pos - start_pos).data()));
-	//		pRCV->data.replace(start_pos, end_pos - start_pos, p);
-	//		start_pos += p.length();
-	//	}
-	//	else start_pos += 7;
-	//}
+	while ((start_pos = pRCV->data.find("file://", start_pos)) != std::string::npos) {
+		if ((end_pos = pRCV->data.find("\'", start_pos)) != std::string::npos) {
+			p = GetLocalPath(sessionId, pJoiner, pRCV->data.substr(start_pos, end_pos - start_pos).data());
+			pRCV->data.replace(start_pos, end_pos - start_pos, get_uri(p.data()).data());
+			start_pos += p.length();
+		}
+		else start_pos ++;
+	}
 
 	m_mReceives[pSD->base_table].push_back(pRCV);
 
@@ -324,13 +324,13 @@ void CSender::MissingCheck()
 	}
 }
 
-const char * CSender::GetLocalPath(SessionId sessionId, const char * pJoiner, const char * sURI)
+qcc::String CSender::GetLocalPath(SessionId sessionId, const char * pJoiner, const char * sURI)
 {
 	vRecvFiles::iterator itFiles;
 
 	if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, sURI))) != gRecvFiles.end())
-		return (*itFiles)->path.data();
-	else return NULL;
+		return (*itFiles)->path;
+	else return "";
 }
 
 void CSender::MissingCheck(const char * sJoiner, int nSNum)
@@ -362,15 +362,12 @@ void CSender::OnEnd(int footprint, const char * pJoiner)
 	}
 }
 
-void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg)
+void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const char* /*srcPath*/, Message& msg)
 {
-	QCC_UNUSED(pMember);
-	QCC_UNUSED(srcPath);
-
-	const char * pJoiner = msg->GetSender();
 	uint8_t * data;
 	size_t size;
 	mTrain::iterator iter;
+	const char * pJoiner = msg->GetSender();
 	mTrain & train = m_mTrain[pJoiner];
 	SessionId sessionId = m_pMob->GetSessionID();
 
@@ -385,6 +382,16 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 			train[pTH->chain].footprint = pTH->footprint;
 			blkInit(&(train[pTH->chain].body));
 			memcpy(train[pTH->chain].extra, pTH->extra, TRAIN_EXTRA_LEN);
+
+			if (pTH->action == ACT_FILE) {
+				FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)pTH->extra;
+
+				if (pFSI) {
+					qcc::String uri = pFSI->uri;
+
+					train[pTH->chain].path = mem2file(0, 0, uri.substr(uri.find_last_of('.')).data());
+				}
+			}
 		}
 	}
 	else if ((iter = train.find(((int*)data)[0])) != train.end()){
@@ -474,7 +481,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 					pFRI->uri = pFSI->uri;
 					pFRI->joiner = pJoiner;
 					pFRI->session_id = sessionId;
-					pFRI->path = mem2file(iter->second.body.z, iter->second.body.nUsed, pFRI->uri.substr(pFRI->uri.find_last_of('.')).data());
+					pFRI->path = iter->second.path;
 
 					gRecvFiles.push_back(pFRI);
 				}
@@ -492,6 +499,17 @@ void CSender::OnRecvData(const InterfaceDescription::Member* pMember, const char
 				break;
 			}
 			train.erase(iter);
+		}
+		else if (iter->second.action == ACT_FILE) {
+			FILE *fp;
+			FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.extra;
+
+			if (pFSI) {
+				if ((fp = fopen(iter->second.path.data(), "ab")) != NULL) {
+					fwrite((char *)(((int*)data) + 1), sizeof(char), size - sizeof(int), fp);
+					fclose(fp);
+				}
+			}
 		}
 		else mem2mem(&(iter->second.body), (char *)(((int*)data) + 1), size - sizeof(int));
 	}

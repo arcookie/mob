@@ -79,6 +79,7 @@ typedef struct {
 typedef struct {
 	int footprint;  // 
 	int action; // 0 data, 1 file list 2 file list req 3 file
+	qcc::String path;
 	char extra[TRAIN_EXTRA_LEN];
 	Block body;
 } TRAIN;
@@ -150,7 +151,7 @@ public:
 
 	void MissingCheck();
 	void MissingCheck(const char * sJoiner, int nSNum);
-	const char * GetLocalPath(SessionId sessionId, const char * pJoiner, const char * sURI);
+	qcc::String GetLocalPath(SessionId sessionId, const char * pJoiner, const char * sURI);
 	void Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen);
 	void OnEnd(int footprint, const char * pJoiner);
 	void OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg);

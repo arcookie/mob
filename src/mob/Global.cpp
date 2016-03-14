@@ -129,7 +129,7 @@ const qcc::String mem2file(const char * data, int length, const char * sExt)
 	qcc::String sPath = get_unique_path(sExt);
 
 	if ((fp = fopen(sPath.data(), "wb")) != NULL) {
-		fwrite(data, sizeof(char), length, fp);
+		if (length > 0) fwrite(data, sizeof(char), length, fp);
 		fclose(fp);
 		return sPath;
 	}
