@@ -53,16 +53,25 @@ struct find_uri : std::unary_function<FILE_RECV_ITEM*, bool> {
 
 CSender::~CSender()
 {
-	vRecvFiles::iterator iter;
-	mReceives::iterator miter;
-	vReceives::iterator viter;
+	{
+		vRecvFiles::iterator iter;
 
-	for (iter = gRecvFiles.begin(); iter != gRecvFiles.end(); iter++){
-		delete (*iter);
+		for (iter = gRecvFiles.begin(); iter != gRecvFiles.end(); iter++){
+			delete (*iter);
+		}
 	}
-	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
-		for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
-			delete (*viter);
+
+	{
+		mReceives::iterator iter;
+		mReceive::iterator _iter;
+		sReceive::iterator __iter;
+
+		for (iter = m_mReceives.begin(); iter != m_mReceives.end(); iter++) {
+			for (_iter = iter->second.begin(); _iter != iter->second.end(); _iter++) {
+				for (__iter = _iter->second.begin(); __iter != _iter->second.end(); __iter++) {
+					delete (*__iter);
+				}
+			}
 		}
 	}
 }
@@ -113,8 +122,7 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 	pRCV->joiner = pSD->joiner;
 	pRCV->snum_prev = pSD->snum_prev;
 	pRCV->snum = pSD->snum;
-	pRCV->auto_inc_start = pSD->auto_inc;
-	pRCV->auto_inc_end = pSD->auto_inc;
+	pRCV->snum_end = pSD->snum;
 	pRCV->data.assign(pText->z, pText->nUsed);
 
 	while ((start_pos = pRCV->data.find("file://", start_pos)) != std::string::npos) {
@@ -126,9 +134,9 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 		else start_pos ++;
 	}
 
-	m_mReceives[pSD->base_table].push_back(pRCV);
+	m_mReceives[pSD->base_table][pSD->joiner].insert(pRCV);
 
-	if (!StartMissingCheck()) Apply(sessionId);
+	if (!SetMissingTimer()) Apply(sessionId);
 }
 
 void CSender::OnEnd(int footprint, const char * pJoiner)
@@ -161,7 +169,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 		else if (pTH->action == ACT_SIGNAL) {
 			SYNC_SIGNAL * pSS = (SYNC_SIGNAL *)pTH->extra;
 
-			if (pSS) MissingCheck(pSS->joiner, pSS->auto_inc);
+			if (pSS) MissingCheck(pSS->joiner, pSS->snum);
 		}
 		else {
 			train[pTH->chain].action = pTH->action;
@@ -191,14 +199,13 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 
 				strcpy_s(sd.joiner, sizeof(sd.joiner), m_pMob->GetJoinName());
 
-				QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt2, ("SELECT num, auto_inc, snum, base_table, undo FROM works WHERE joiner=%Q AND auto_inc IN (%s)", sd.joiner, iter->second.body.z),
-					sd.auto_inc = sqlite3_column_int(pStmt2, 1);
-					sd.snum = sqlite3_column_int(pStmt2, 2);
-					strcpy_s(sd.base_table, sizeof(sd.base_table), (const char *)sqlite3_column_text(pStmt2, 3));
+				QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt2, ("SELECT num, snum, base_table, undo FROM works WHERE joiner=%Q AND auto_inc IN (%s)", sd.joiner, iter->second.body.z),
+					sd.snum = sqlite3_column_int(pStmt2, 1);
+					strcpy_s(sd.base_table, sizeof(sd.base_table), (const char *)sqlite3_column_text(pStmt2, 2));
 					QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt, ("SELECT joiner, snum FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC LIMIT 1", sqlite3_column_int(pStmt2, 0), sd.base_table),
 						strcpy_s(sd.joiner_prev, sizeof(sd.joiner_prev), (const char *)sqlite3_column_text(pStmt, 0));
 						sd.snum_prev = sqlite3_column_int(pStmt, 1);
-						alljoyn_send(sessionId, msg->GetSender(), ACT_DATA, (char *)sqlite3_column_text(pStmt2, 4), sqlite3_column_bytes(pStmt2, 4), (const char *)&sd, sizeof(SYNC_DATA));
+						alljoyn_send(sessionId, msg->GetSender(), ACT_DATA, (char *)sqlite3_column_text(pStmt2, 3), sqlite3_column_bytes(pStmt2, 3), (const char *)&sd, sizeof(SYNC_DATA));
 						break;
 					);
 				);
@@ -274,7 +281,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 				break;
 			}
 			case ACT_NO_MISSING:
-				EXECUTE_SQL_V(m_pMob->GetMainDB(), ("UPDATE works SET auto_inc=%s WHERE num=%d;", iter->second.body.z, sessionId));
+				EXECUTE_SQL_V(m_pMob->GetMainDB(), ("UPDATE works SET snum=%s WHERE num=%d;", iter->second.body.z, sessionId));
 				break;
 			}
 			train.erase(iter);

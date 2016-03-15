@@ -55,7 +55,7 @@ public:
 	sqlite3 * GetBackDB() { return m_pBackDB; }
 	sqlite3 * GetUndoDB() { return m_pUndoDB; }
 
-	int GetSerial() { return m_nSerial; }
+	int GetSerial() { return m_nSNum; }
 	void MissingCheck()	{ m_pSender->MissingCheck(); }
 	SessionId GetSessionID() { return m_nSessionID; }
 	void SetSessionID(SessionId id) { m_nSessionID = id; }
@@ -71,7 +71,7 @@ public:
 
 protected:
 	ajn::BusAttachment *	m_pBus;
-	int						m_nSerial;
+	int						m_nSNum;
 	CSender*				m_pSender;
 	SessionId				m_nSessionID;
 	MobBusListener			m_BusListener;

@@ -145,9 +145,9 @@ void CALLBACK fnSendSignal(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWORD
 
 	strcpy_s(ss.joiner, sizeof(ss.joiner), gpMob->GetJoinName());
 
-	QUERY_SQL_V(gpMob->GetMainDB(), pStmt, ("SELECT MAX(auto_inc) AS n FROM works WHERE joiner = %Q;", ss.joiner),
-		ss.auto_inc = sqlite3_column_int(pStmt, 0);
-		if (ss.auto_inc != gpMob->GetSerial()) alljoyn_send(gpMob->GetSessionID(), NULL, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+	QUERY_SQL_V(gpMob->GetMainDB(), pStmt, ("SELECT MAX(snum) AS n FROM works WHERE joiner = %Q;", ss.joiner),
+		ss.snum = sqlite3_column_int(pStmt, 0);
+		if (ss.snum != gpMob->GetSerial()) alljoyn_send(gpMob->GetSessionID(), NULL, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
 		break;
 	);
 }
@@ -156,12 +156,12 @@ void alljoyn_signal(sqlite3 * pDB, unsigned int nSessionID, const char * pOwner,
 {
 	sqlite3_stmt *pStmt = NULL;
 
-	QUERY_SQL_V(pDB, pStmt, ("SELECT MAX(auto_inc) AS n FROM works WHERE joiner = %Q;", pOwner),
+	QUERY_SQL_V(pDB, pStmt, ("SELECT MAX(snum) AS n FROM works WHERE joiner = %Q;", pOwner),
 		SYNC_SIGNAL ss;
 
-		ss.auto_inc = sqlite3_column_int(pStmt, 0);
+		ss.snum = sqlite3_column_int(pStmt, 0);
 		strcpy_s(ss.joiner, sizeof(ss.joiner), pOwner);
-		if (ss.auto_inc != gpMob->GetSerial()) alljoyn_send(nSessionID, pTarget, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+		if (ss.snum != gpMob->GetSerial()) alljoyn_send(nSessionID, pTarget, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
 		break;
 	);
 }

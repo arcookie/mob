@@ -125,13 +125,6 @@ int mob_sync_db(sqlite3 * pDb)
 				break;
 			);
 
-			sd.auto_inc = 1;
-			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT (MAX(auto_inc) + 1) AS sn FROM works WHERE joiner = %Q;", sd.joiner),
-				int n = sqlite3_column_int(pStmt, 0);
-				if (n > 0) sd.auto_inc = n; 
-				break;
-			);
-
 			sd.snum = 1;
 			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT (MAX(snum) + 1) AS sn FROM works WHERE joiner = %Q AND base_table = %Q;", sd.joiner, sd.base_table), 
 				int n = sqlite3_column_int(pStmt, 0);
@@ -143,7 +136,7 @@ int mob_sync_db(sqlite3 * pDb)
 
 			sqlite3_exec(pBackDb, redo.z, 0, 0, 0);
 
-			EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, auto_inc, snum, base_table, undo, redo) VALUES (%Q, %d, %d, %Q, %Q, %Q);", sd.joiner, sd.auto_inc, sd.snum, (*iter).data(), undo.z, redo.z));
+			EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", sd.joiner, sd.snum, (*iter).data(), undo.z, redo.z));
 
 			alljoyn_send(session_id, NULL, ACT_DATA, redo.z, redo.nUsed, (const char *)&sd, sizeof(SYNC_DATA));
 

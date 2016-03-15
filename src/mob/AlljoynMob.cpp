@@ -38,7 +38,7 @@
 CAlljoynMob::CAlljoynMob() 
 {
 	m_pBus = NULL;
-	m_nSerial = 0;
+	m_nSNum = 0;
 	m_pSender = NULL;
 	m_nSessionID = 0;
 	m_pMainDB = NULL;
@@ -86,7 +86,7 @@ sqlite3 * CAlljoynMob::OpenDB(const char *zFilename)
 			EXECUTE_SQL_V(m_pMainDB, ("ATTACH %Q as aux;", b_path.data()));
 		}
 		if (sqlite3_open(get_unique_path(".db3").data(), &m_pUndoDB) == SQLITE_OK)
-			sqlite3_exec(m_pUndoDB, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, joiner CHAR(16), auto_inc INT DEFAULT 1, snum INT DEFAULT 1, base_table VARCHAR(64), undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
+			sqlite3_exec(m_pUndoDB, "CREATE TABLE works (num INTEGER PRIMARY KEY AUTOINCREMENT DEFAULT 1, joiner CHAR(16), snum INT DEFAULT 1, base_table VARCHAR(64), undo TEXT, redo TEXT);PRAGMA synchronous=OFF;PRAGMA journal_mode=OFF;", 0, 0, 0);
 
 		return m_pMainDB;
 	}

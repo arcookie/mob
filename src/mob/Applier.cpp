@@ -103,7 +103,6 @@ void CSender::Apply(SessionId sessionId)
 			for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
 
 				apply.snum = (*vRcvIt)->snum;
-				apply.auto_inc = (*vRcvIt)->auto_inc_end;
 				apply.joiner = (*vRcvIt)->joiner;
 				apply.data = (*vRcvIt)->data;
 
@@ -111,10 +110,10 @@ void CSender::Apply(SessionId sessionId)
 					bFirst = FALSE;
 					(*vRcvIt)->data.clear();
 
-					vReceives::iterator it = std::find_if(mRcvIt->second.begin(), mRcvIt->second.end(), find_id((*vRcvIt)->joiner, (*vRcvIt)->auto_inc_end - 1));
+					vReceives::iterator it = std::find_if(mRcvIt->second.begin(), mRcvIt->second.end(), find_id((*vRcvIt)->joiner, (*vRcvIt)->snum - 1));
 
 					if (it != mRcvIt->second.end()) {
-						(*it)->auto_inc_end = (*vRcvIt)->auto_inc_end;
+						(*it)->snum_end = (*vRcvIt)->snum;
 						delete (*vRcvIt);
 						vRcvIt = mRcvIt->second.erase(vRcvIt);
 					}
@@ -157,7 +156,7 @@ void CSender::Apply(SessionId sessionId)
 			for (viter = applies.begin(); viter != applies.end(); viter++) {
 				for (siter = (*viter)->applies.begin(); siter != (*viter)->applies.end(); siter++) {
 					sqlite3_exec(pBackDb, (*siter).data.data(), 0, 0, 0);
-					EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, auto_inc, snum, base_table, undo, redo) VALUES (%Q, %d, %d, %Q, %Q, %Q);", (*siter).joiner.data(), (*siter).auto_inc, (*siter).snum, mRcvIt->first.data(), undo.z, (*siter).data.data()));
+					EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", (*siter).joiner.data(), (*siter).snum, mRcvIt->first.data(), undo.z, (*siter).data.data()));
 				}
 			}
 			blkFree(&undo);

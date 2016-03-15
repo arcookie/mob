@@ -95,9 +95,8 @@ typedef struct {
 
 typedef struct {
 	int snum;
+	int snum_end;
 	int snum_prev;
-	int auto_inc_start;
-	int auto_inc_end;
 	qcc::String joiner;
 	qcc::String joiner_prev;
 	std::string data;
@@ -108,13 +107,12 @@ struct find_id : std::unary_function<RECEIVE*, bool> {
 	qcc::String joiner;
 	find_id(qcc::String & u, int sn) :joiner(u), snum(sn) { }
 	bool operator()(RECEIVE const * m) const {
-		return (m->joiner == joiner && m->auto_inc_start <= snum && m->auto_inc_end >= snum);
+		return (m->joiner == joiner && m->snum <= snum && m->snum_end >= snum);
 	}
 };
 
 typedef struct {
 	int snum;
-	int auto_inc;
 	qcc::String joiner;
 	std::string data;
 } APPLY;
@@ -136,11 +134,20 @@ typedef struct {
 	sApplies applies;
 } APPLIES;
 
+struct CompareRECEIVE
+{
+	bool operator()(RECEIVE const * _Left, RECEIVE const * _Right) const
+	{
+		return _Left->joiner.compare(_Right->joiner) < 0;
+	}
+};
+
 typedef std::map<int, TRAIN>				mTrain;
 typedef std::map<qcc::String, mTrain>		mTrains;
 typedef std::vector<APPLIES*>				vApplies;
-typedef std::vector<RECEIVE*>				vReceives;
-typedef std::map<qcc::String, vReceives>	mReceives;
+typedef std::set<RECEIVE*, CompareRECEIVE>	sReceive;
+typedef std::map<qcc::String, sReceive>		mReceive;
+typedef std::map<qcc::String, mReceive>		mReceives;
 typedef std::vector<FILE_RECV_ITEM*>		vRecvFiles;
 
 class CAlljoynMob;
@@ -158,9 +165,9 @@ public:
 	QStatus SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, FILE_SEND_ITEM * pFSI);
 	QStatus SendData(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
-	void MissingCheck();
-	void MissingCheck(const char * sJoiner, int nSNum);
-	BOOL StartMissingCheck();
+	BOOL SetMissingTimer();
+	void MissingCheck(const char * sJoiner = NULL, int nSNum = -1);
+	BOOL MissingCheck(std::map<qcc::String, qcc::String> & sRes, const char * sJoiner = NULL, int nEnd = -1);
 
 	void Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen);
 	void OnEnd(int footprint, const char * pJoiner);
