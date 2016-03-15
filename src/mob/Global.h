@@ -40,7 +40,7 @@
 #define ACT_FILE		3
 #define ACT_MISSING		4
 #define ACT_SIGNAL		5
-#define ACT_NO_MISSED	6
+#define ACT_NO_MISSING	6
 #define ACT_END			7
 
 #define QUERY_SQL(__db__, __stmt__, __sql__, ...)	\

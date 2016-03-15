@@ -63,19 +63,21 @@ void CSender::MissingCheck()
 
 void CSender::MissingCheck(const char * sJoiner, int nSNum)
 {
+	BOOL bFind = FALSE;
 	mReceives::iterator miter;
 	vReceives::iterator viter;
 	qcc::String s = qcc::I32ToString(nSNum);
 
 	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
 		for (viter = miter->second.begin(); viter != miter->second.end(); viter++) {
-			if (!((*viter)->auto_inc_start <= nSNum && (*viter)->auto_inc_end >= nSNum && (*viter)->joiner == sJoiner)) {
-				m_pMob->SendData(sJoiner, time(NULL), ACT_MISSING, m_pMob->GetSessionID(), s.data(), s.size());
-				return;
+			if ((*viter)->auto_inc_start <= nSNum && (*viter)->auto_inc_end >= nSNum && (*viter)->joiner == sJoiner) {
+				bFind = TRUE;
+				break;
 			}
 		}
 	}
-	m_pMob->SendData(sJoiner, time(NULL), ACT_NO_MISSED, m_pMob->GetSessionID(), s.data(), s.size());
+	if (bFind) m_pMob->SendData(sJoiner, time(NULL), ACT_NO_MISSING, m_pMob->GetSessionID(), s.data(), s.size()); 
+	else m_pMob->SendData(sJoiner, time(NULL), ACT_MISSING, m_pMob->GetSessionID(), s.data(), s.size());
 }
 
 void CALLBACK fnMissingCheck(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWORD /*dwTime*/)

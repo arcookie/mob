@@ -158,6 +158,11 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 		TRAIN_HEADER * pTH = (TRAIN_HEADER *)data;
 
 		if (pTH->action == ACT_END) OnEnd(pTH->footprint, pJoiner);
+		else if (pTH->action == ACT_SIGNAL) {
+			SYNC_SIGNAL * pSS = (SYNC_SIGNAL *)pTH->extra;
+
+			if (pSS) MissingCheck(pSS->joiner, pSS->auto_inc);
+		}
 		else {
 			train[pTH->chain].action = pTH->action;
 			train[pTH->chain].footprint = pTH->footprint;
@@ -268,14 +273,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 				}
 				break;
 			}
-			case ACT_SIGNAL:
-			{
-				SYNC_SIGNAL * pSS = (SYNC_SIGNAL *)iter->second.extra;
-
-				if (pSS) MissingCheck(pSS->joiner, pSS->auto_inc);
-				break;
-			}
-			case ACT_NO_MISSED:
+			case ACT_NO_MISSING:
 				EXECUTE_SQL_V(m_pMob->GetMainDB(), ("UPDATE works SET auto_inc=%s WHERE num=%d;", iter->second.body.z, sessionId));
 				break;
 			}

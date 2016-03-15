@@ -25,6 +25,7 @@
 */
 
 #include "mob.h"
+#include "Global.h"
 #include "MobBusListener.h"
 #include "MobClient.h"
 
@@ -78,6 +79,18 @@ void MobBusListener::FoundAdvertisedName(const char* name, TransportMask transpo
 void MobBusListener::SessionJoined(SessionPort /*sessionPort*/, SessionId id, const char* joiner)
 {
 	m_pMob->SetSessionID(id);
+
+	sqlite3_stmt *pStmt = NULL;
+	const char * pOwner = m_pMob->GetJoinName();
+
+	QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt, ("SELECT MAX(auto_inc) AS n FROM works WHERE joiner = %Q;", pOwner),
+		SYNC_SIGNAL ss;
+
+		ss.auto_inc = sqlite3_column_int(pStmt, 0);
+		strcpy_s(ss.joiner, sizeof(ss.joiner), pOwner);
+		alljoyn_send(id, joiner, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+		break;
+	);
 
 	printf("SessionJoined with %s (id=%d)\n", joiner, id);
 	m_pMob->EnableConcurrentCallbacks();

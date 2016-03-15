@@ -126,10 +126,18 @@ int mob_sync_db(sqlite3 * pDb)
 			);
 
 			sd.auto_inc = 1;
-			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT (MAX(auto_inc) + 1) AS sn FROM works WHERE joiner = %Q;", sd.joiner), sd.auto_inc = sqlite3_column_int(pStmt, 0); break;);
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT (MAX(auto_inc) + 1) AS sn FROM works WHERE joiner = %Q;", sd.joiner),
+				int n = sqlite3_column_int(pStmt, 0);
+				if (n > 0) sd.auto_inc = n; 
+				break;
+			);
 
 			sd.snum = 1;
-			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT (MAX(snum) + 1) AS sn FROM works WHERE joiner = %Q AND base_table = %Q;", sd.joiner, sd.base_table), sd.snum = sqlite3_column_int(pStmt, 0); break;);
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT (MAX(snum) + 1) AS sn FROM works WHERE joiner = %Q AND base_table = %Q;", sd.joiner, sd.base_table), 
+				int n = sqlite3_column_int(pStmt, 0);
+				if (n > 0) sd.snum = n;
+				break;
+			);
 
 			diff_one_table(pDb, "aux", "main", (*iter).data(), &redo);
 
