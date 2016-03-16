@@ -101,27 +101,12 @@ typedef struct {
 	std::string data;
 } RECEIVE;
 
-typedef struct {
-	int snum;
-	qcc::String joiner;
-	std::string data;
-} APPLY;
-
-struct CompareAPPLY
-{
-	bool operator()(APPLY const& _Left, APPLY const& _Right) const
-	{
-		return _Left.joiner.compare(_Right.joiner) < 0;
-	}
-};
-
-typedef struct CompareAPPLY				compApply;
-typedef std::set<APPLY, compApply>		sApplies;
+typedef std::map<qcc::String, const RECEIVE*>		mApplies;
 
 typedef struct {
 	int snum_prev;
 	qcc::String joiner_prev;
-	sApplies applies;
+	mApplies applies;
 } APPLIES;
 
 struct CompareRECEIVE
@@ -134,7 +119,7 @@ struct CompareRECEIVE
 
 typedef std::map<int, TRAIN>				mTrain;
 typedef std::map<qcc::String, mTrain>		mTrains;
-typedef std::vector<APPLIES*>				vApplies;
+typedef std::vector<APPLIES>				vApplies;
 typedef std::set<RECEIVE*, CompareRECEIVE>	sReceive;
 typedef std::map<qcc::String, sReceive>		mReceive;
 typedef std::map<qcc::String, mReceive>		mReceives;
@@ -151,7 +136,7 @@ public:
 	QStatus _Send(SessionId sessionId, const char * sSvrName, int nChain, const char * pData, int nLength);
 
 	void Apply(SessionId sessionId);
-	BOOL PushApply(vApplies & applies, APPLY & apply, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst);
+	BOOL PushApply(vApplies & applies, const char * sJoiner, const RECEIVE * pReceive, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst);
 	QStatus SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, FILE_SEND_ITEM * pFSI);
 	QStatus SendData(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
@@ -159,7 +144,7 @@ public:
 	void MissingCheck(const char * sJoiner = NULL, int nSNum = -1);
 
 	void Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen);
-	void OnEnd(int footprint, const char * pJoiner);
+	void OnDataEnd(int footprint, const char * pJoiner);
 	void OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg);
 
 	virtual void GetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}

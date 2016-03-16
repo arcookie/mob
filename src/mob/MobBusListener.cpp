@@ -87,8 +87,11 @@ void MobBusListener::SessionJoined(SessionPort /*sessionPort*/, SessionId id, co
 		SYNC_SIGNAL ss;
 
 		ss.snum = sqlite3_column_int(pStmt, 1);
-		strcpy_s(ss.joiner, sizeof(ss.joiner), pOwner);
-		alljoyn_send(id, joiner, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+
+		if (ss.snum > 0) {
+			strcpy_s(ss.joiner, sizeof(ss.joiner), pOwner);
+			alljoyn_send(id, joiner, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+		}
 		break;
 	);
 

@@ -34,21 +34,22 @@ struct find_id_applies : std::unary_function<RECEIVE*, bool> {
 	int snum_prev;
 	qcc::String joiner_prev;
 	find_id_applies(const char * u, int sn) :joiner_prev(u), snum_prev(sn) { }
-	bool operator()(APPLIES const * m) const {
-		return (m->joiner_prev == joiner_prev && m->snum_prev == snum_prev);
+	bool operator()(APPLIES const & m) const {
+		return (m.joiner_prev == joiner_prev && m.snum_prev == snum_prev);
 	}
 };
 
-BOOL CSender::PushApply(vApplies & applies, APPLY & apply, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst)
+BOOL CSender::PushApply(vApplies & applies, const char * sJoiner, const RECEIVE * pReceive, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst)
 {
 	vApplies::iterator viter;
 
-	if ((viter = std::find_if(applies.begin(), applies.end(), find_id_applies(sJoinerPrev, nSNumPrev))) != applies.end()) (*viter)->applies.insert(apply);
+	if ((viter = std::find_if(applies.begin(), applies.end(), find_id_applies(sJoinerPrev, nSNumPrev))) != applies.end()) (*viter).applies[sJoiner] = pReceive;
 	else if (bFirst) {
-		APPLIES * pAppl = new APPLIES;
+		APPLIES appl;
 
-		pAppl->applies.insert(apply);
-		applies.push_back(pAppl);
+		appl.applies[sJoiner] = pReceive;
+
+		applies.push_back(appl);
 		bFirst = FALSE;
 	}
 	return TRUE;
@@ -70,46 +71,44 @@ void CSender::Apply(SessionId sessionId)
 	BOOL bFirst;
 	int num, n;
 	BOOL bWorked;
-	APPLY apply;
 	SYNC_DATA sd;
 	sqlite3 * pMainDb = m_pMob->GetMainDB();
 	sqlite3 * pBackDb = m_pMob->GetBackDB();
 	sqlite3 * pUndoDb = m_pMob->GetUndoDB();
-	sApplies::iterator siter;
-	vApplies::iterator viter;
-	mReceives::iterator mRcvIt;
+	mReceives::iterator iter;
 	mReceive::iterator _mRcvIt;
 	sReceive::iterator sRcvIt;
 	RECEIVE rcv;
 
+	// for renewal of table list in sqlite
 	sqlite3_stmt *pStmt = db_prepare(pMainDb, "SELECT name FROM main.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' UNION\n"
 		"SELECT name FROM aux.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' ORDER BY name");
 
 	while (SQLITE_ROW == sqlite3_step(pStmt));
 
 	sqlite3_finalize(pStmt);
-
-	for (mRcvIt = m_mReceives.begin(); mRcvIt != m_mReceives.end(); mRcvIt++) {
+	
+	for (iter = m_mReceives.begin(); iter != m_mReceives.end(); iter++) {
 		vApplies applies;
+		/*
+		for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
+			if (!(*vRcvIt)->data.empty() && (n = mob_find_parent_db(sessionId, (*vRcvIt)->joiner_prev.data(), (*vRcvIt)->snum_prev, mRcvIt->first.data())) > num) num = n;
+		}
 
-		//for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
-		//	if (!(*vRcvIt)->data.empty() && (n = mob_find_parent_db(sessionId, (*vRcvIt)->joiner_prev.data(), (*vRcvIt)->snum_prev, mRcvIt->first.data())) > num) num = n;
-		//}
-
-		//while ((num = mob_get_db(sessionId, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, apply, mRcvIt->first.data(), sd.joiner_prev, sd.snum_prev, TRUE);
+		while ((num = mob_get_db(sessionId, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, apply, mRcvIt->first.data(), sd.joiner_prev, sd.snum_prev, TRUE);
 
 		bFirst = TRUE;
 
 		do {
 			bWorked = FALSE;
-			for (_mRcvIt = mRcvIt->second.begin(); _mRcvIt != mRcvIt->second.end(); _mRcvIt) {
+			for (_mRcvIt = mRcvIt->second.begin(); _mRcvIt != mRcvIt->second.end(); _mRcvIt++) {
 				for (sRcvIt = _mRcvIt->second.begin(); sRcvIt != _mRcvIt->second.end();) {
 
-					apply.snum = (*sRcvIt)->snum;
-					apply.joiner = _mRcvIt->first;
-					apply.data = (*sRcvIt)->data;
+					//apply.snum = (*sRcvIt)->snum;
+					//apply.joiner = _mRcvIt->first;
+					//apply.data = (*sRcvIt)->data;
 
-					if (!(*sRcvIt)->data.empty() && PushApply(applies, apply, mRcvIt->first.data(), (*sRcvIt)->joiner_prev.data(), (*sRcvIt)->snum_prev, bFirst)) {
+					if (!(*sRcvIt)->data.empty() && PushApply(applies, _mRcvIt->first.data(), (*sRcvIt), mRcvIt->first.data(), (*sRcvIt)->joiner_prev.data(), (*sRcvIt)->snum_prev, bFirst)) {
 						bFirst = FALSE;
 						(*sRcvIt)->data.clear();
 
@@ -129,45 +128,38 @@ void CSender::Apply(SessionId sessionId)
 				}
 			}
 		} while (bWorked);
+		*/
 
-		vApplies::iterator viter = applies.begin();
+		vApplies::iterator _iter = applies.begin();
 
-		if (viter != applies.end()) {
+		if (_iter != applies.end()) {
+			sqlite3_stmt *pStmt = NULL;
+
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*_iter).joiner_prev.data(), (*_iter).snum_prev, iter->first.data()),
+				sqlite3_stmt *_pStmt = NULL;
+				int num = sqlite3_column_int(pStmt, 0);
+
+				QUERY_SQL_V(pUndoDb, _pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", num, iter->first.data()),
+					sqlite3_exec(pMainDb, (const char *)sqlite3_column_text(_pStmt, 0), 0, 0, 0););
+				EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", num, iter->first.data()));
+				break;
+			);
+
 			Block undo;
-			sqlite3_stmt *pStmt2 = NULL;
-			sqlite3_stmt *pStmt3 = NULL;
+			mApplies::iterator __iter;
 
 			blkInit(&undo);
 
-			QUERY_SQL_V(pUndoDb, pStmt2, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*viter)->joiner_prev.data(), (*viter)->snum_prev, mRcvIt->first.data()),
-				int num = sqlite3_column_int(pStmt2, 0);
-
-			QUERY_SQL_V(pUndoDb, pStmt3, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", num, mRcvIt->first.data()),
-				sqlite3_exec(pMainDb, (const char *)sqlite3_column_text(pStmt3, 0), 0, 0, 0);
-			);
-			EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", num, mRcvIt->first.data()));
-			break;
-			);
-
-			for (viter = applies.begin(); viter != applies.end(); viter++) {
-				for (siter = (*viter)->applies.begin(); siter != (*viter)->applies.end(); siter++) {
-					sqlite3_exec(pMainDb, (*siter).data.data(), 0, 0, 0);
+			for (_iter = applies.begin(); _iter != applies.end(); _iter++) {
+				for (__iter = (*_iter).applies.begin(); __iter != (*_iter).applies.end(); __iter++) {
+					sqlite3_exec(pMainDb, __iter->second->data.data(), 0, 0, 0);
+					diff_one_table(pMainDb, "main", "aux", iter->first.data(), &undo);
+					sqlite3_exec(pBackDb, __iter->second->data.data(), 0, 0, 0);
+					EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", __iter->first.data(), __iter->second->snum, iter->first.data(), undo.z, __iter->second->data.data()));
+					blkFree(&undo);
 					bDone = TRUE;
 				}
 			}
-
-			diff_one_table(pMainDb, "main", "aux", mRcvIt->first.data(), &undo);
-
-			for (viter = applies.begin(); viter != applies.end(); viter++) {
-				for (siter = (*viter)->applies.begin(); siter != (*viter)->applies.end(); siter++) {
-					sqlite3_exec(pBackDb, (*siter).data.data(), 0, 0, 0);
-					EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", (*siter).joiner.data(), (*siter).snum, mRcvIt->first.data(), undo.z, (*siter).data.data()));
-				}
-			}
-			blkFree(&undo);
-		}
-		for (viter = applies.begin(); viter != applies.end(); viter++) {
-			delete (*viter);
 		}
 		if (bDone && fnReceiveProc) fnReceiveProc(pMainDb);
 	}

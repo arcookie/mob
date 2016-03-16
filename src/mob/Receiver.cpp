@@ -138,7 +138,7 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 	if (!SetMissingTimer()) Apply(sessionId);
 }
 
-void CSender::OnEnd(int footprint, const char * pJoiner)
+void CSender::OnDataEnd(int footprint, const char * pJoiner)
 {
 	mTrain::iterator iter;
 	SessionId sessionId = m_pMob->GetSessionID();
@@ -164,7 +164,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 	if (IS_TRAIN_HEADER(data) && size == sizeof(TRAIN_HEADER)) {
 		TRAIN_HEADER * pTH = (TRAIN_HEADER *)data;
 
-		if (pTH->action == ACT_END) OnEnd(pTH->footprint, pJoiner);
+		if (pTH->action == ACT_END) OnDataEnd(pTH->footprint, pJoiner);
 		else if (pTH->action == ACT_SIGNAL) {
 			SYNC_SIGNAL * pSS = (SYNC_SIGNAL *)pTH->extra;
 
@@ -197,22 +197,29 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 				SYNC_DATA sd;
 
 				strcpy_s(sd.joiner, sizeof(sd.joiner), m_pMob->GetJoinName());
+				qcc::String having;
 
-				QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt2, ("SELECT num, snum, base_table, undo FROM works WHERE joiner=%Q AND auto_inc IN (%s)", sd.joiner, iter->second.body.z),
+				having.assign(iter->second.body.z, iter->second.body.nUsed);
+
+				blkFree(&(iter->second.body));
+
+				printf("%s: %ssqlite>", msg->GetSender(), having.data());
+
+				QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt2, ("SELECT num, snum, base_table, redo FROM works WHERE joiner=%Q AND snum IN (%s)", sd.joiner, having.data()),
 					sd.snum = sqlite3_column_int(pStmt2, 1);
 					strcpy_s(sd.base_table, sizeof(sd.base_table), (const char *)sqlite3_column_text(pStmt2, 2));
-					QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt, ("SELECT joiner, snum FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC LIMIT 1", sqlite3_column_int(pStmt2, 0), sd.base_table),
+					sd.snum_prev = -1;
+					QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt, ("SELECT joiner, snum FROM works WHERE num < %d AND base_table=%Q ORDER BY num DESC LIMIT 1", sqlite3_column_int(pStmt2, 0), sd.base_table),
 						strcpy_s(sd.joiner_prev, sizeof(sd.joiner_prev), (const char *)sqlite3_column_text(pStmt, 0));
 						sd.snum_prev = sqlite3_column_int(pStmt, 1);
-						alljoyn_send(sessionId, msg->GetSender(), ACT_DATA, (char *)sqlite3_column_text(pStmt2, 3), sqlite3_column_bytes(pStmt2, 3), (const char *)&sd, sizeof(SYNC_DATA));
 						break;
 					);
+					alljoyn_send(sessionId, msg->GetSender(), ACT_DATA, (char *)sqlite3_column_text(pStmt2, 3), sqlite3_column_bytes(pStmt2, 3) + 1, (const char *)&sd, sizeof(SYNC_DATA));
 				);
 				break;
 			}
 			case ACT_DATA:
 			{
-				printf("%s: %ssqlite>", msg->GetSender(), iter->second.body);
 				TRAIN & cargo = m_mStation[pJoiner][iter->second.footprint];
 				cargo.action = iter->second.action;
 				blkMove(&(cargo.body), &(iter->second.body));
@@ -237,9 +244,10 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 						pFSI++;
 					}
 					if (data.nUsed > 0) SendData(pJoiner, iter->second.footprint, ACT_FLIST_REQ, sessionId, data.z, data.nUsed); // special target most be assigned.
-					else OnEnd(iter->second.footprint, pJoiner);
+					else OnDataEnd(iter->second.footprint, pJoiner);
 
 					blkFree(&data);
+					blkFree(&(iter->second.body));
 				}
 				break;
 			case ACT_FLIST_REQ:
@@ -254,6 +262,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 					}
 					SendData(pJoiner, iter->second.footprint, ACT_END, sessionId, 0, 0);// special target most be assigned.
 				}
+				blkFree(&(iter->second.body));
 				break;
 			case ACT_FILE:
 			{
@@ -280,7 +289,18 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 				break;
 			}
 			case ACT_NO_MISSING:
-				EXECUTE_SQL_V(m_pMob->GetMainDB(), ("UPDATE works SET snum=%s WHERE num=%d;", iter->second.body.z, sessionId));
+			{
+				qcc::String snum;
+
+				snum.assign(iter->second.body.z, iter->second.body.nUsed);
+
+				blkFree(&(iter->second.body));
+
+				EXECUTE_SQL_V(m_pMob->GetMainDB(), ("UPDATE works SET snum=%s WHERE num=%d;", snum.data(), sessionId));
+				break;
+			}
+			default:
+				blkFree(&(iter->second.body));
 				break;
 			}
 			train.erase(iter);
