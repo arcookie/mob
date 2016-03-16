@@ -119,7 +119,6 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 	SYNC_DATA * pSD = (SYNC_DATA *)pExtra;
 
 	pRCV->joiner_prev = pSD->joiner_prev;
-	pRCV->joiner = pSD->joiner;
 	pRCV->snum_prev = pSD->snum_prev;
 	pRCV->snum = pSD->snum;
 	pRCV->snum_end = pSD->snum;

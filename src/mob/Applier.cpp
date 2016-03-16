@@ -78,7 +78,9 @@ void CSender::Apply(SessionId sessionId)
 	sApplies::iterator siter;
 	vApplies::iterator viter;
 	mReceives::iterator mRcvIt;
-	vReceives::iterator vRcvIt;
+	mReceive::iterator _mRcvIt;
+	sReceive::iterator sRcvIt;
+	RECEIVE rcv;
 
 	sqlite3_stmt *pStmt = db_prepare(pMainDb, "SELECT name FROM main.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' UNION\n"
 		"SELECT name FROM aux.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' ORDER BY name");
@@ -100,28 +102,31 @@ void CSender::Apply(SessionId sessionId)
 
 		do {
 			bWorked = FALSE;
-			for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
+			for (_mRcvIt = mRcvIt->second.begin(); _mRcvIt != mRcvIt->second.end(); _mRcvIt) {
+				for (sRcvIt = _mRcvIt->second.begin(); sRcvIt != _mRcvIt->second.end();) {
 
-				apply.snum = (*vRcvIt)->snum;
-				apply.joiner = (*vRcvIt)->joiner;
-				apply.data = (*vRcvIt)->data;
+					apply.snum = (*sRcvIt)->snum;
+					apply.joiner = _mRcvIt->first;
+					apply.data = (*sRcvIt)->data;
 
-				if (!(*vRcvIt)->data.empty() && PushApply(applies, apply, mRcvIt->first.data(), (*vRcvIt)->joiner_prev.data(), (*vRcvIt)->snum_prev, bFirst)) {
-					bFirst = FALSE;
-					(*vRcvIt)->data.clear();
+					if (!(*sRcvIt)->data.empty() && PushApply(applies, apply, mRcvIt->first.data(), (*sRcvIt)->joiner_prev.data(), (*sRcvIt)->snum_prev, bFirst)) {
+						bFirst = FALSE;
+						(*sRcvIt)->data.clear();
 
-					vReceives::iterator it = std::find_if(mRcvIt->second.begin(), mRcvIt->second.end(), find_id((*vRcvIt)->joiner, (*vRcvIt)->snum - 1));
+						rcv.snum_end = rcv.snum = (*sRcvIt)->snum - 1;
 
-					if (it != mRcvIt->second.end()) {
-						(*it)->snum_end = (*vRcvIt)->snum;
-						delete (*vRcvIt);
-						vRcvIt = mRcvIt->second.erase(vRcvIt);
+						sReceive::iterator it = _mRcvIt->second.find(&rcv);
+
+						if (it != _mRcvIt->second.end()) {
+							(*it)->snum_end = (*sRcvIt)->snum;
+							delete (*sRcvIt);
+							sRcvIt = _mRcvIt->second.erase(sRcvIt);
+						}
+						else sRcvIt++;
+
+						bWorked = TRUE;
 					}
-					else vRcvIt++;
-
-					bWorked = TRUE;
 				}
-				else vRcvIt++;
 			}
 		} while (bWorked);
 

@@ -97,19 +97,9 @@ typedef struct {
 	int snum;
 	int snum_end;
 	int snum_prev;
-	qcc::String joiner;
 	qcc::String joiner_prev;
 	std::string data;
 } RECEIVE;
-
-struct find_id : std::unary_function<RECEIVE*, bool> {
-	int snum;
-	qcc::String joiner;
-	find_id(qcc::String & u, int sn) :joiner(u), snum(sn) { }
-	bool operator()(RECEIVE const * m) const {
-		return (m->joiner == joiner && m->snum <= snum && m->snum_end >= snum);
-	}
-};
 
 typedef struct {
 	int snum;
@@ -138,7 +128,7 @@ struct CompareRECEIVE
 {
 	bool operator()(RECEIVE const * _Left, RECEIVE const * _Right) const
 	{
-		return _Left->joiner.compare(_Right->joiner) < 0;
+		return  _Left->snum_end < _Right->snum;
 	}
 };
 
@@ -167,7 +157,6 @@ public:
 
 	BOOL SetMissingTimer();
 	void MissingCheck(const char * sJoiner = NULL, int nSNum = -1);
-	BOOL MissingCheck(std::map<qcc::String, qcc::String> & sRes, const char * sJoiner = NULL, int nEnd = -1);
 
 	void Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen);
 	void OnEnd(int footprint, const char * pJoiner);
