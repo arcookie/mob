@@ -66,15 +66,15 @@ typedef struct {
 
 typedef struct {
 	int marks[TRAIN_MARK_END];
-	int footprint;  // 
-	int action; // 0 data, 1 file list 2 file list req 3 file
+	int footprint;
+	int action;
 	int chain;
 	char extra[TRAIN_EXTRA_LEN];
 } TRAIN_HEADER;
 
 typedef struct {
-	int footprint;  // 
-	int action; // 0 data, 1 file list 2 file list req 3 file
+	int footprint;
+	int action;
 	qcc::String path;
 	char extra[TRAIN_EXTRA_LEN];
 	Block body;
@@ -118,8 +118,8 @@ public:
 	virtual void SetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}
 
 private:
-	CAlljoynMob *						m_pMob;
-	mReceives							m_mReceives;
+	CAlljoynMob *	m_pMob;
+	mReceives		m_mReceives;
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sender.cpp
@@ -151,8 +151,8 @@ public:
 	void OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg);
 
 private:
-	mTrains								m_mTrain;
-	mTrains								m_mStation;
+	mTrains	m_mTrain;
+	mTrains	m_mStation;
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Applier.cpp
