@@ -32,10 +32,15 @@
 #include "Sender.h"
 #include "AlljoynMob.h"
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// define
 
 #define FIND_IN_RECV(a,b,c,...)	{mReceives::iterator a; mReceive::iterator b; sReceive::iterator c; \
 	for (a = m_mReceives.begin(); a != m_mReceives.end(); a++) { for (b = a->second.begin(); b != a->second.end(); b++) {\
 	for (c = b->second.begin(); c != b->second.end(); c++) { __VA_ARGS__ }}}}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CSender
 
 void CSender::MissingCheck(const char * sJoiner /* NULL */, int nSNum /* -1 */)
 {
@@ -44,7 +49,7 @@ void CSender::MissingCheck(const char * sJoiner /* NULL */, int nSNum /* -1 */)
 	std::map<qcc::String, qcc::String> miss;
 
 	FIND_IN_RECV(iter, _iter, __iter, 
-		if (!(*__iter)->data.empty() && (*__iter)->snum > 1) {
+		if ((*__iter)->data.z && (*__iter)->snum > 1) {
 			rcv.snum_end = rcv.snum = (*__iter)->snum - 1;
 			if (_iter->second.find(&rcv) == _iter->second.end()) {
 				if (miss[_iter->first] != "") miss[_iter->first] += ",";
@@ -83,7 +88,7 @@ BOOL CSender::SetMissingTimer()
 	RECEIVE rcv;
 
 	FIND_IN_RECV(iter, _iter, __iter,
-		if (!(*__iter)->data.empty() && (*__iter)->snum > 1) {
+		if ((*__iter)->data.z && (*__iter)->snum > 1) {
 			rcv.snum_end = rcv.snum = (*__iter)->snum - 1;
 			if (_iter->second.find(&rcv) == _iter->second.end()) {
 				SetTimer(NULL, TM_MISSING_CHECK, INT_MISSING_CHECK, &fnMissingCheck);

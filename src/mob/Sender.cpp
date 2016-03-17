@@ -33,6 +33,14 @@
 #include "Sender.h"
 #include "AlljoynMob.h"
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// defines
+
+#define SEND_BUF		(8192 - sizeof(int))
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CSender
+
 CSender::CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* sPath) : m_pMob(pMob), BusObject(sPath), m_pMobSignalMember(NULL)
 {
 	QStatus status;
@@ -110,5 +118,38 @@ QStatus CSender::SendData(const char * sJoiner, int nFootPrint, int nAction, Ses
 		_Send(sessionId, sJoiner, th.chain, 0, -1);
 	}
 
+	return status;
+}
+
+QStatus CSender::SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, FILE_SEND_ITEM * pFSI)
+{
+	FILE *fp;
+	QStatus status = ER_OK;
+
+	if ((fp = fopen(get_path(pFSI->uri).data(), "rb")) != NULL) {
+		int l;
+		BYTE Buf[SEND_BUF];
+		TRAIN_HEADER th;
+		uint8_t flags = 0;
+
+		TRAIN_HEADER(th.marks);
+
+		th.footprint = nFootPrint;
+		th.action = nAction;
+		th.chain = time(NULL);
+
+		memcpy(th.extra, (const char *)pFSI, sizeof(FILE_SEND_ITEM));
+
+		MsgArg mobArg("ay", sizeof(TRAIN_HEADER), &th);
+
+		if ((status = Signal(sJoiner, sessionId, *m_pMobSignalMember, &mobArg, 1, 0, flags)) == ER_OK) {
+			while ((l = fread(Buf, sizeof(BYTE), SEND_BUF, fp)) > 0) {
+				if ((status = _Send(sessionId, sJoiner, th.chain, (const char *)Buf, l)) != ER_OK) break;
+			}
+			_Send(sessionId, sJoiner, th.chain, 0, -1);
+		}
+
+		fclose(fp);
+	}
 	return status;
 }

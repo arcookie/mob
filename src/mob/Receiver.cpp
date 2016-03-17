@@ -34,7 +34,24 @@
 #include "Sender.h"
 #include "AlljoynMob.h"
 
-vRecvFiles gRecvFiles;
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// define
+
+#define IS_TRAIN_HEADER(a)	\
+	(((int*)a)[0] == TRAIN_MARK_1 && ((int*)a)[1] == TRAIN_MARK_2 && ((int*)a)[2] == TRAIN_MARK_3 && \
+	((int*)a)[3] == TRAIN_MARK_4 && ((int*)a)[4] == TRAIN_MARK_5 && ((int*)a)[5] == TRAIN_MARK_6)
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// typedef
+
+typedef struct {
+	int session_id;
+	int mtime;
+	long fsize;
+	qcc::String uri;
+	qcc::String path;
+	qcc::String joiner;
+} FILE_RECV_ITEM;
 
 struct find_uri : std::unary_function<FILE_RECV_ITEM*, bool> {
 	int session_id;
@@ -50,6 +67,36 @@ struct find_uri : std::unary_function<FILE_RECV_ITEM*, bool> {
 		return (m->session_id == session_id && m->joiner == joiner && m->uri == uri);
 	}
 };
+
+typedef std::vector<FILE_RECV_ITEM*>		vRecvFiles;
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// global variables
+
+vRecvFiles gRecvFiles;
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// static functions
+
+void file_uri_replace(SessionId sessionId, const char * pJoiner, std::string & data)
+{
+	qcc::String p;
+	vRecvFiles::iterator itFiles;
+	size_t start_pos = 0;
+	size_t end_pos;
+
+	while ((start_pos = data.find("file://", start_pos)) != std::string::npos) {
+		if ((end_pos = data.find("\'", start_pos)) != std::string::npos) {
+			if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, data.substr(start_pos, end_pos - start_pos).data()))) != gRecvFiles.end())
+				data.replace(start_pos, end_pos - start_pos, get_uri((*itFiles)->path.data()).data());
+			start_pos += p.length();
+		}
+		else start_pos++;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CSender
 
 CSender::~CSender()
 {
@@ -76,66 +123,20 @@ CSender::~CSender()
 	}
 }
 
-QStatus CSender::SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, FILE_SEND_ITEM * pFSI)
-{
-	FILE *fp;
-	QStatus status = ER_OK;
-
-	if ((fp = fopen(get_path(pFSI->uri).data(), "rb")) != NULL) {
-		int l;
-		BYTE Buf[SEND_BUF];
-		TRAIN_HEADER th;
-		uint8_t flags = 0;
-
-		TRAIN_HEADER(th.marks);
-
-		th.footprint = nFootPrint;
-		th.action = nAction;
-		th.chain = time(NULL);
-
-		memcpy(th.extra, (const char *)pFSI, sizeof(FILE_SEND_ITEM));
-
-		MsgArg mobArg("ay", sizeof(TRAIN_HEADER), &th);
-
-		if ((status = Signal(sJoiner, sessionId, *m_pMobSignalMember, &mobArg, 1, 0, flags)) == ER_OK) {
-			while ((l = fread(Buf, sizeof(BYTE), SEND_BUF, fp)) > 0) {
-				if ((status = _Send(sessionId, sJoiner, th.chain, (const char *)Buf, l)) != ER_OK) break;
-			}
-			_Send(sessionId, sJoiner, th.chain, 0, -1);
-		}
-
-		fclose(fp);
-	}
-	return status;
-}
-
 void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen)
 {
 	RECEIVE * pRCV = new RECEIVE;
-	qcc::String p;
-	size_t start_pos = 0;
-	size_t end_pos;
-	vRecvFiles::iterator itFiles;
 	SYNC_DATA * pSD = (SYNC_DATA *)pExtra;
 
 	pRCV->prev.joiner = pSD->joiner_prev;
 	pRCV->prev.snum = pSD->snum_prev;
 	pRCV->snum = pSD->snum;
 	pRCV->snum_end = pSD->snum;
-	pRCV->data.assign(pText->z, pText->nUsed);
-
-	while ((start_pos = pRCV->data.find("file://", start_pos)) != std::string::npos) {
-		if ((end_pos = pRCV->data.find("\'", start_pos)) != std::string::npos) {
-			if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, pRCV->data.substr(start_pos, end_pos - start_pos).data()))) != gRecvFiles.end())
-				pRCV->data.replace(start_pos, end_pos - start_pos, get_uri((*itFiles)->path.data()).data());
-			start_pos += p.length();
-		}
-		else start_pos ++;
-	}
+	blkMove(&pRCV->data, pText);
 
 	m_mReceives[pSD->base_table][pSD->joiner].insert(pRCV);
 
-	if (!SetMissingTimer()) Apply(sessionId);
+	if (!SetMissingTimer()) Apply(sessionId, pJoiner);
 }
 
 void CSender::OnDataEnd(int footprint, const char * pJoiner)

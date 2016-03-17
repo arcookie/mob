@@ -29,33 +29,49 @@
 #include "Sender.h"
 #include "AlljoynMob.h"
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// typedef
 
-struct find_id_applies : std::unary_function<RECEIVE*, bool> {
-	int snum_prev;
-	qcc::String joiner_prev;
-	find_id_applies(const char * u, int sn) :joiner_prev(u), snum_prev(sn) { }
-	bool operator()(APPLIES const & m) const {
-		return (m.prev.joiner == joiner_prev && m.prev.snum == snum_prev);
-	}
-};
+typedef struct {
+	int snum;
+	std::string data;
+} APPLY;
 
-BOOL CSender::PushApply(vApplies & applies, const char * sJoiner, const RECEIVE * pReceive, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst)
+typedef std::map<qcc::String, APPLY>		mApplies;
+
+typedef struct {
+	SKEY prev;
+	mApplies applies;
+} APPLIES;
+
+typedef std::vector<APPLIES>				vApplies;
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// static function
+
+static void save2applies(vApplies & applies, SKEY & prev, const char * pJoiner, int snum, const char * data)
 {
-	vApplies::iterator viter;
+	vApplies::iterator iter;
 
-	if ((viter = std::find_if(applies.begin(), applies.end(), find_id_applies(sJoinerPrev, nSNumPrev))) != applies.end()) (*viter).applies[sJoiner] = pReceive;
-	else if (bFirst) {
-		APPLIES appl;
-
-		appl.applies[sJoiner] = pReceive;
-
-		applies.push_back(appl);
-		bFirst = FALSE;
+	for (iter = applies.begin(); iter != applies.end(); iter++) {
+		if ((*iter).prev.snum == prev.snum && (*iter).prev.joiner == prev.joiner) {
+			(*iter).applies[pJoiner].snum = snum;
+			(*iter).applies[pJoiner].data = data;
+			break;
+		}
 	}
-	return TRUE;
+	if (iter == applies.end()) {
+		applies.push_back(APPLIES());
+		applies.back().prev = prev;
+		(*iter).applies[pJoiner].snum = snum;
+		(*iter).applies[pJoiner].data = data;
+	}
 }
 
-void CSender::Apply(SessionId sessionId)
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CSender
+
+void CSender::Apply(SessionId sessionId, const char * pJoiner)
 {
 	BOOL bDone = FALSE;
 	BOOL bFirst;
@@ -63,6 +79,7 @@ void CSender::Apply(SessionId sessionId)
 	sqlite3 * pBackDb = m_pMob->GetBackDB();
 	sqlite3 * pUndoDb = m_pMob->GetUndoDB();
 	mReceives::iterator iter;
+	APPLY apply;
 	RECEIVE rcv;
 
 	// for renewal of table list in sqlite
@@ -72,7 +89,7 @@ void CSender::Apply(SessionId sessionId)
 	while (SQLITE_ROW == sqlite3_step(pStmt));
 
 	sqlite3_finalize(pStmt);
-	
+
 	for (iter = m_mReceives.begin(); iter != m_mReceives.end(); iter++) {
 		vApplies applies;
 		{
@@ -83,13 +100,14 @@ void CSender::Apply(SessionId sessionId)
 
 			for (_iter = iter->second.begin(); _iter != iter->second.end(); _iter++) {
 				for (__iter = _iter->second.begin(); __iter != _iter->second.end(); ) {
-					if (!(*__iter)->data.empty()) {
+					if ((*__iter)->data.z) {
 						QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*__iter)->prev.joiner.data(), (*__iter)->prev.snum, iter->first.data()),
 							if (undo > (n = sqlite3_column_int(pStmt, 0))) undo = n;
 						);
-						// push apply (reversed)
 
-						(*__iter)->data.clear();
+						save2applies(applies, (*__iter)->prev, _iter->first.data(), (*__iter)->snum, (*__iter)->data.z);
+
+						blkFree(&(*__iter)->data);
 
 						rcv.snum_end = rcv.snum = (*__iter)->snum - 1;
 
@@ -105,8 +123,14 @@ void CSender::Apply(SessionId sessionId)
 			}
 
 			if (undo < INT_MAX) {
+				SKEY prev = { -1, "" };
+
+				QUERY_SQL_V(pUndoDb, pStmt, ("SELECT snum, joiner, redo FROM works WHERE num >= %d AND base_table=%Q ORDER BY num ASC", undo, iter->first.data()),
+					if (prev.snum > 0) save2applies(applies, prev, (const char *)sqlite3_column_text(pStmt, 1), sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 2));
+					prev.snum = sqlite3_column_int(pStmt, 0);
+					prev.joiner = (const char *)sqlite3_column_text(pStmt, 1);
+				);
 				QUERY_SQL_V(pUndoDb, pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", undo, iter->first.data()),
-					// push apply (reversed)
 					sqlite3_exec(pMainDb, (const char *)sqlite3_column_text(pStmt, 0), 0, 0, 0);
 				);
 				EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", undo, iter->first.data()));
@@ -122,10 +146,11 @@ void CSender::Apply(SessionId sessionId)
 
 			for (_iter = applies.begin(); _iter != applies.end(); _iter++) {
 				for (__iter = (*_iter).applies.begin(); __iter != (*_iter).applies.end(); __iter++) {
-					sqlite3_exec(pMainDb, __iter->second->data.data(), 0, 0, 0);
+					file_uri_replace(sessionId, pJoiner, __iter->second.data);
+					sqlite3_exec(pMainDb, __iter->second.data.data(), 0, 0, 0);
 					diff_one_table(pMainDb, "main", "aux", iter->first.data(), &undo);
-					sqlite3_exec(pBackDb, __iter->second->data.data(), 0, 0, 0);
-					EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", __iter->first.data(), __iter->second->snum, iter->first.data(), undo.z, __iter->second->data.data()));
+					sqlite3_exec(pBackDb, __iter->second.data.data(), 0, 0, 0);
+					EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", __iter->first.data(), __iter->second.snum, iter->first.data(), undo.z, __iter->second.data.data()));
 					blkFree(&undo);
 					bDone = TRUE;
 				}

@@ -35,7 +35,8 @@
 
 using namespace ajn;
 
-#define SEND_BUF		(8192 - sizeof(int))
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// defines
 
 #define TRAIN_MARK_1	0x34533454
 #define TRAIN_MARK_2	0x34531454
@@ -49,18 +50,13 @@ using namespace ajn;
 
 #define TRAIN_HEADER(a)	int __o__[TRAIN_MARK_END] = {TRAIN_MARK_1,TRAIN_MARK_2,TRAIN_MARK_3,TRAIN_MARK_4,TRAIN_MARK_5,TRAIN_MARK_6,}; memcpy((char *)(a), (char *)__o__, sizeof(__o__));
 
-#define IS_TRAIN_HEADER(a)	\
-	(((int*)a)[0] == TRAIN_MARK_1 && ((int*)a)[1] == TRAIN_MARK_2 && ((int*)a)[2] == TRAIN_MARK_3 && \
-	((int*)a)[3] == TRAIN_MARK_4 && ((int*)a)[4] == TRAIN_MARK_5 && ((int*)a)[5] == TRAIN_MARK_6)
-
-#define MOB_SERVICE_INTERFACE_NAME "org.alljoyn.bus.arcookie.mob"
-#define MOB_SERVICE_OBJECT_PATH "/mobService"
-#define MOB_PORT 27
-
 #define TM_MISSING_CHECK	1
 #define TM_SEND_SIGNAL		2
 #define INT_MISSING_CHECK	2000
 #define INT_SEND_SIGNAL		5000
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// typedef
 
 typedef struct {
 	char uri[MAX_PATH];
@@ -85,15 +81,6 @@ typedef struct {
 } TRAIN;
 
 typedef struct {
-	int session_id;
-	int mtime;
-	long fsize;
-	qcc::String uri;
-	qcc::String path;
-	qcc::String joiner;
-} FILE_RECV_ITEM;
-
-typedef struct {
 	int snum;
 	qcc::String joiner;
 } SKEY;
@@ -102,15 +89,8 @@ typedef struct {
 	int snum;
 	int snum_end;
 	SKEY prev;
-	std::string data;
+	Block data;
 } RECEIVE;
-
-typedef std::map<qcc::String, const RECEIVE*>		mApplies;
-
-typedef struct {
-	SKEY prev;
-	mApplies applies;
-} APPLIES;
 
 struct CompareRECEIVE
 {
@@ -122,43 +102,65 @@ struct CompareRECEIVE
 
 typedef std::map<int, TRAIN>				mTrain;
 typedef std::map<qcc::String, mTrain>		mTrains;
-typedef std::vector<APPLIES>				vApplies;
 typedef std::set<RECEIVE*, CompareRECEIVE>	sReceive;  // key to compare is snum range
 typedef std::map<qcc::String, sReceive>		mReceive;  // key is joiner name
 typedef std::map<qcc::String, mReceive>		mReceives; // key is table name
-typedef std::vector<FILE_RECV_ITEM*>		vRecvFiles;
 
 class CAlljoynMob;
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CSender
+
 class CSender : public BusObject {
+
 public:
-
-	CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* sPath);
-	~CSender();
-
-	QStatus _Send(SessionId sessionId, const char * sSvrName, int nChain, const char * pData, int nLength);
-
-	void Apply(SessionId sessionId);
-	BOOL PushApply(vApplies & applies, const char * sJoiner, const RECEIVE * pReceive, const char * sTable, const char * sJoinerPrev, int nSNumPrev, BOOL bFirst);
-	QStatus SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, FILE_SEND_ITEM * pFSI);
-	QStatus SendData(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
-
-	BOOL SetMissingTimer();
-	void MissingCheck(const char * sJoiner = NULL, int nSNum = -1);
-
-	void Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen);
-	void OnDataEnd(int footprint, const char * pJoiner);
-	void OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg);
-
 	virtual void GetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}
 	virtual void SetProp(const InterfaceDescription::Member* /*member*/, Message& /*msg*/) {}
 
 private:
 	CAlljoynMob *						m_pMob;
+	mReceives							m_mReceives;
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Sender.cpp
+
+public:
+	CSender(CAlljoynMob * pMob, BusAttachment& bus, const char* sPath);
+	QStatus SendFile(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, FILE_SEND_ITEM * pFSI);
+	QStatus SendData(const char * sJoiner, int nFootPrint, int nAction, SessionId sessionId, const char * msg, int nLength, const char * pExtra = NULL, int nExtLen = 0);
+
+private:
+	const InterfaceDescription::Member* m_pMobSignalMember;
+
+	QStatus _Send(SessionId sessionId, const char * sSvrName, int nChain, const char * pData, int nLength);
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// MissingCheck.cpp
+
+public:
+	BOOL SetMissingTimer();
+	void MissingCheck(const char * sJoiner = NULL, int nSNum = -1);
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Receiver.cpp
+
+public:
+	~CSender();
+	void Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen);
+	void OnDataEnd(int footprint, const char * pJoiner);
+	void OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg);
+
+private:
 	mTrains								m_mTrain;
 	mTrains								m_mStation;
-	mReceives							m_mReceives;
-	const InterfaceDescription::Member* m_pMobSignalMember;
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Applier.cpp
+
+public:
+	void Apply(SessionId sessionId, const char * pJoiner);
 };
+
+extern void file_uri_replace(SessionId sessionId, const char * pJoiner, std::string & data);
 
 #endif /* _SENDER_H_ */
