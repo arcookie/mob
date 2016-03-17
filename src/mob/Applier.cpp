@@ -37,14 +37,12 @@ typedef struct {
 	std::string data;
 } APPLY;
 
-typedef std::map<qcc::String, APPLY>		mApplies;
-
 typedef struct {
 	SKEY prev;
-	mApplies applies;
+	std::map<qcc::String, APPLY> applies;
 } APPLIES;
 
-typedef std::vector<APPLIES>				vApplies;
+typedef std::vector<APPLIES>			vApplies;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // static function
@@ -74,13 +72,10 @@ static void save2applies(vApplies & applies, SKEY & prev, const char * pJoiner, 
 void CSender::Apply(SessionId sessionId, const char * pJoiner)
 {
 	BOOL bDone = FALSE;
-	BOOL bFirst;
+	mReceives::iterator iter;
 	sqlite3 * pMainDb = m_pMob->GetMainDB();
 	sqlite3 * pBackDb = m_pMob->GetBackDB();
 	sqlite3 * pUndoDb = m_pMob->GetUndoDB();
-	mReceives::iterator iter;
-	APPLY apply;
-	RECEIVE rcv;
 
 	// for renewal of table list in sqlite
 	sqlite3_stmt *pStmt = db_prepare(pMainDb, "SELECT name FROM main.sqlite_master WHERE type='table' AND sql NOT LIKE 'CREATE VIRTUAL%%' UNION\n"
@@ -93,6 +88,7 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 	for (iter = m_mReceives.begin(); iter != m_mReceives.end(); iter++) {
 		vApplies applies;
 		{
+			RECEIVE rcv;
 			int undo = INT_MAX, n;
 			mReceive::iterator _iter;
 			sReceive::iterator __iter;
@@ -140,7 +136,7 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 		{
 			Block undo;
 			vApplies::iterator _iter;
-			mApplies::iterator __iter;
+			std::map<qcc::String, APPLY>::iterator __iter;
 
 			blkInit(&undo);
 
