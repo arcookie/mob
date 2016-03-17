@@ -95,17 +95,20 @@ typedef struct {
 
 typedef struct {
 	int snum;
+	qcc::String joiner;
+} SKEY;
+
+typedef struct {
+	int snum;
 	int snum_end;
-	int snum_prev;
-	qcc::String joiner_prev;
+	SKEY prev;
 	std::string data;
 } RECEIVE;
 
 typedef std::map<qcc::String, const RECEIVE*>		mApplies;
 
 typedef struct {
-	int snum_prev;
-	qcc::String joiner_prev;
+	SKEY prev;
 	mApplies applies;
 } APPLIES;
 

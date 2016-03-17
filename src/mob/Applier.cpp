@@ -35,7 +35,7 @@ struct find_id_applies : std::unary_function<RECEIVE*, bool> {
 	qcc::String joiner_prev;
 	find_id_applies(const char * u, int sn) :joiner_prev(u), snum_prev(sn) { }
 	bool operator()(APPLIES const & m) const {
-		return (m.joiner_prev == joiner_prev && m.snum_prev == snum_prev);
+		return (m.prev.joiner == joiner_prev && m.prev.snum == snum_prev);
 	}
 };
 
@@ -59,7 +59,6 @@ void CSender::Apply(SessionId sessionId)
 {
 	BOOL bDone = FALSE;
 	BOOL bFirst;
-	int num, n;
 	sqlite3 * pMainDb = m_pMob->GetMainDB();
 	sqlite3 * pBackDb = m_pMob->GetBackDB();
 	sqlite3 * pUndoDb = m_pMob->GetUndoDB();
@@ -77,16 +76,16 @@ void CSender::Apply(SessionId sessionId)
 	for (iter = m_mReceives.begin(); iter != m_mReceives.end(); iter++) {
 		vApplies applies;
 		{
+			int undo = INT_MAX, n;
 			mReceive::iterator _iter;
 			sReceive::iterator __iter;
 			sReceive::iterator ___iter;
 
-			num = INT_MAX;
 			for (_iter = iter->second.begin(); _iter != iter->second.end(); _iter++) {
 				for (__iter = _iter->second.begin(); __iter != _iter->second.end(); ) {
 					if (!(*__iter)->data.empty()) {
-						QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*__iter)->joiner_prev.data(), (*__iter)->snum_prev, iter->first.data()),
-							if (num > (n = sqlite3_column_int(pStmt, 0))) num = n;
+						QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*__iter)->prev.joiner.data(), (*__iter)->prev.snum, iter->first.data()),
+							if (undo > (n = sqlite3_column_int(pStmt, 0))) undo = n;
 						);
 						// push apply (reversed)
 
@@ -105,12 +104,12 @@ void CSender::Apply(SessionId sessionId)
 				}
 			}
 
-			if (num < INT_MAX) {
-				QUERY_SQL_V(pUndoDb, pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", num, iter->first.data()),
+			if (undo < INT_MAX) {
+				QUERY_SQL_V(pUndoDb, pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", undo, iter->first.data()),
 					// push apply (reversed)
 					sqlite3_exec(pMainDb, (const char *)sqlite3_column_text(pStmt, 0), 0, 0, 0);
 				);
-				EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", num, iter->first.data()));
+				EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", undo, iter->first.data()));
 			}
 		}
 

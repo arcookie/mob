@@ -118,8 +118,8 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 	vRecvFiles::iterator itFiles;
 	SYNC_DATA * pSD = (SYNC_DATA *)pExtra;
 
-	pRCV->joiner_prev = pSD->joiner_prev;
-	pRCV->snum_prev = pSD->snum_prev;
+	pRCV->prev.joiner = pSD->joiner_prev;
+	pRCV->prev.snum = pSD->snum_prev;
 	pRCV->snum = pSD->snum;
 	pRCV->snum_end = pSD->snum;
 	pRCV->data.assign(pText->z, pText->nUsed);
