@@ -120,9 +120,9 @@ struct CompareRECEIVE
 typedef std::map<int, TRAIN>				mTrain;
 typedef std::map<qcc::String, mTrain>		mTrains;
 typedef std::vector<APPLIES>				vApplies;
-typedef std::set<RECEIVE*, CompareRECEIVE>	sReceive;
-typedef std::map<qcc::String, sReceive>		mReceive;
-typedef std::map<qcc::String, mReceive>		mReceives;
+typedef std::set<RECEIVE*, CompareRECEIVE>	sReceive;  // key to compare is snum range
+typedef std::map<qcc::String, sReceive>		mReceive;  // key is joiner name
+typedef std::map<qcc::String, mReceive>		mReceives; // key is table name
 typedef std::vector<FILE_RECV_ITEM*>		vRecvFiles;
 
 class CAlljoynMob;

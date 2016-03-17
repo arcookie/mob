@@ -55,29 +55,15 @@ BOOL CSender::PushApply(vApplies & applies, const char * sJoiner, const RECEIVE 
 	return TRUE;
 }
 
-int mob_find_parent_db(unsigned int sid, const char * joiner, int snum, const char * sTable)
-{
-	return 0;
-}
-
-int mob_get_db(unsigned int sid, int num, const char * sTable, SYNC_DATA * pSD)
-{
-	return 0;
-}
-
 void CSender::Apply(SessionId sessionId)
 {
 	BOOL bDone = FALSE;
 	BOOL bFirst;
 	int num, n;
-	BOOL bWorked;
-	SYNC_DATA sd;
 	sqlite3 * pMainDb = m_pMob->GetMainDB();
 	sqlite3 * pBackDb = m_pMob->GetBackDB();
 	sqlite3 * pUndoDb = m_pMob->GetUndoDB();
 	mReceives::iterator iter;
-	mReceive::iterator _mRcvIt;
-	sReceive::iterator sRcvIt;
 	RECEIVE rcv;
 
 	// for renewal of table list in sqlite
@@ -90,62 +76,47 @@ void CSender::Apply(SessionId sessionId)
 	
 	for (iter = m_mReceives.begin(); iter != m_mReceives.end(); iter++) {
 		vApplies applies;
-		/*
-		for (vRcvIt = mRcvIt->second.begin(); vRcvIt != mRcvIt->second.end();) {
-			if (!(*vRcvIt)->data.empty() && (n = mob_find_parent_db(sessionId, (*vRcvIt)->joiner_prev.data(), (*vRcvIt)->snum_prev, mRcvIt->first.data())) > num) num = n;
-		}
+		{
+			mReceive::iterator _iter;
+			sReceive::iterator __iter;
+			sReceive::iterator ___iter;
 
-		while ((num = mob_get_db(sessionId, num, mRcvIt->first.data(), &sd)) > 0) PushApply(applies, apply, mRcvIt->first.data(), sd.joiner_prev, sd.snum_prev, TRUE);
+			num = INT_MAX;
+			for (_iter = iter->second.begin(); _iter != iter->second.end(); _iter++) {
+				for (__iter = _iter->second.begin(); __iter != _iter->second.end(); ) {
+					if (!(*__iter)->data.empty()) {
+						QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*__iter)->joiner_prev.data(), (*__iter)->snum_prev, iter->first.data()),
+							if (num > (n = sqlite3_column_int(pStmt, 0))) num = n;
+						);
+						// push apply (reversed)
 
-		bFirst = TRUE;
+						(*__iter)->data.clear();
 
-		do {
-			bWorked = FALSE;
-			for (_mRcvIt = mRcvIt->second.begin(); _mRcvIt != mRcvIt->second.end(); _mRcvIt++) {
-				for (sRcvIt = _mRcvIt->second.begin(); sRcvIt != _mRcvIt->second.end();) {
+						rcv.snum_end = rcv.snum = (*__iter)->snum - 1;
 
-					//apply.snum = (*sRcvIt)->snum;
-					//apply.joiner = _mRcvIt->first;
-					//apply.data = (*sRcvIt)->data;
-
-					if (!(*sRcvIt)->data.empty() && PushApply(applies, _mRcvIt->first.data(), (*sRcvIt), mRcvIt->first.data(), (*sRcvIt)->joiner_prev.data(), (*sRcvIt)->snum_prev, bFirst)) {
-						bFirst = FALSE;
-						(*sRcvIt)->data.clear();
-
-						rcv.snum_end = rcv.snum = (*sRcvIt)->snum - 1;
-
-						sReceive::iterator it = _mRcvIt->second.find(&rcv);
-
-						if (it != _mRcvIt->second.end()) {
-							(*it)->snum_end = (*sRcvIt)->snum;
-							delete (*sRcvIt);
-							sRcvIt = _mRcvIt->second.erase(sRcvIt);
+						if ((___iter = _iter->second.find(&rcv)) != _iter->second.end()) {
+							(*___iter)->snum_end = (*__iter)->snum;
+							delete (*__iter);
+							__iter = _iter->second.erase(__iter);
+							continue;
 						}
-						else sRcvIt++;
-
-						bWorked = TRUE;
 					}
+					__iter++;
 				}
 			}
-		} while (bWorked);
-		*/
 
-		vApplies::iterator _iter = applies.begin();
-
-		if (_iter != applies.end()) {
-			sqlite3_stmt *pStmt = NULL;
-
-			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*_iter).joiner_prev.data(), (*_iter).snum_prev, iter->first.data()),
-				sqlite3_stmt *_pStmt = NULL;
-				int num = sqlite3_column_int(pStmt, 0);
-
-				QUERY_SQL_V(pUndoDb, _pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", num, iter->first.data()),
-					sqlite3_exec(pMainDb, (const char *)sqlite3_column_text(_pStmt, 0), 0, 0, 0););
+			if (num < INT_MAX) {
+				QUERY_SQL_V(pUndoDb, pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", num, iter->first.data()),
+					// push apply (reversed)
+					sqlite3_exec(pMainDb, (const char *)sqlite3_column_text(pStmt, 0), 0, 0, 0);
+				);
 				EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", num, iter->first.data()));
-				break;
-			);
+			}
+		}
 
+		{
 			Block undo;
+			vApplies::iterator _iter;
 			mApplies::iterator __iter;
 
 			blkInit(&undo);
@@ -161,6 +132,6 @@ void CSender::Apply(SessionId sessionId)
 				}
 			}
 		}
-		if (bDone && fnReceiveProc) fnReceiveProc(pMainDb);
 	}
+	if (bDone && fnReceiveProc) fnReceiveProc(pMainDb);
 }
