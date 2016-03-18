@@ -81,14 +81,14 @@ vRecvFiles gRecvFiles;
 void file_uri_replace(SessionId sessionId, const char * pJoiner, std::string & data)
 {
 	qcc::String p;
-	vRecvFiles::iterator itFiles;
+	vRecvFiles::iterator iter;
 	size_t start_pos = 0;
 	size_t end_pos;
 
 	while ((start_pos = data.find("file://", start_pos)) != std::string::npos) {
 		if ((end_pos = data.find("\'", start_pos)) != std::string::npos) {
-			if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, data.substr(start_pos, end_pos - start_pos).data()))) != gRecvFiles.end())
-				data.replace(start_pos, end_pos - start_pos, get_uri((*itFiles)->path.data()).data());
+			if ((iter = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, data.substr(start_pos, end_pos - start_pos).data()))) != gRecvFiles.end())
+				data.replace(start_pos, end_pos - start_pos, get_uri((*iter)->path.data()).data());
 			start_pos += p.length();
 		}
 		else start_pos++;
@@ -231,14 +231,14 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 				if (sizeof(FILE_SEND_ITEM) % iter->second.body.nUsed == 0) {
 					int n = 0;
 					Block data;
-					vRecvFiles::iterator itFiles;
+					vRecvFiles::iterator _iter;
 					FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.body.z;
 
 					blkInit(&data);
 
 					while (n < iter->second.body.nUsed) {
-						if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, msg->GetSender(), pFSI->uri))) == gRecvFiles.end()|| 
-							(*itFiles)->mtime != pFSI->mtime || (*itFiles)->mtime != pFSI->mtime) 
+						if ((_iter = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, msg->GetSender(), pFSI->uri))) == gRecvFiles.end() ||
+							(*_iter)->mtime != pFSI->mtime || (*_iter)->mtime != pFSI->mtime)
 							mem2mem(&data, (char *)pFSI, sizeof(FILE_SEND_ITEM));
 
 						n += sizeof(FILE_SEND_ITEM);
@@ -267,15 +267,15 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 				break;
 			case ACT_FILE:
 			{
-				vRecvFiles::iterator itFiles;
+				vRecvFiles::iterator _iter;
 				FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.extra;
 
 				if (pFSI) {
 					FILE_RECV_ITEM * pFRI = new FILE_RECV_ITEM;
 
-					if ((itFiles = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, pFSI->uri))) != gRecvFiles.end()) {
-						delete (*itFiles);
-						gRecvFiles.erase(itFiles);
+					if ((_iter = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, pFSI->uri))) != gRecvFiles.end()) {
+						delete (*_iter);
+						gRecvFiles.erase(_iter);
 					}
 
 					pFRI->fsize = pFSI->fsize;
