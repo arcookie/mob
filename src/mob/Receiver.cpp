@@ -170,6 +170,10 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 
 			if (pSS) MissingCheck(pSS->joiner, pSS->snum);
 		}
+		else if (pTH->action == ACT_NO_MISSING) {
+			//sessionId, pJoiner,
+//			EXECUTE_SQL_V(m_pMob->GetMainDB(), ("UPDATE works SET snum=%s WHERE num=%d;", snum.data(), sessionId));
+		}
 		else {
 			train[pTH->chain].action = pTH->action;
 			train[pTH->chain].footprint = pTH->footprint;
@@ -286,17 +290,6 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 
 					gRecvFiles.push_back(pFRI);
 				}
-				break;
-			}
-			case ACT_NO_MISSING:
-			{
-				qcc::String snum;
-
-				snum.assign(iter->second.body.z, iter->second.body.nUsed);
-
-				blkFree(&(iter->second.body));
-
-				EXECUTE_SQL_V(m_pMob->GetMainDB(), ("UPDATE works SET snum=%s WHERE num=%d;", snum.data(), sessionId));
 				break;
 			}
 			default:
