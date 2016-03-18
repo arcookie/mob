@@ -192,11 +192,9 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 			blkInit(&undo);
 
 			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT snum, joiner FROM works WHERE num == %d AND base_table=%Q LIMIT 1", undo, iter->first.data()),
-				int lvl = 0;
 				mApplies _applies;
-				APPLY * pApply = find_first_apply(applies, SKEY(sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 1)));
 
-				collect_apply(_applies, lvl, pApply);
+				collect_apply(_applies, 0, find_first_apply(applies, SKEY(sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 1))));
 
 				mApplies::iterator ____iter;
 				vApplies::iterator _____iter;
