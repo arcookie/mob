@@ -53,12 +53,14 @@ public:
 	sApply	children;
 };
 
-typedef std::vector<APPLY*>			vApplies;
+typedef std::vector<APPLY*>		vApplies;
 
 inline bool CompareApply::operator()(APPLY const * _Left, APPLY const * _Right) const
 {
 	return  _Left->cur.joiner < _Right->cur.joiner;
 }
+
+typedef std::map<int, vApplies>	mApplies;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // static function
@@ -109,6 +111,15 @@ static void delete_applies(vApplies & applies)
 	}
 }
 
+static void collect_apply(mApplies & applies, int level, APPLY * pApply)
+{
+	sApply::iterator iter;
+
+	applies[level].push_back(pApply);
+	for (iter = pApply->children.begin(); iter != pApply->children.end(); iter++) {
+		collect_apply(applies, level + 1, *iter);
+	}
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CSender
@@ -181,16 +192,25 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 			blkInit(&undo);
 
 			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT snum, joiner FROM works WHERE num == %d AND base_table=%Q LIMIT 1", undo, iter->first.data()),
+				int lvl = 0;
+				mApplies _applies;
 				APPLY * pApply = find_first_apply(applies, SKEY(sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 1)));
 
-				while (pApply) {
-					file_uri_replace(sessionId, pJoiner, pApply->data);
-					sqlite3_exec(pMainDb, pApply->data.data(), 0, 0, 0);
-					diff_one_table(pMainDb, "main", "aux", iter->first.data(), &undo);
-					sqlite3_exec(pBackDb, pApply->data.data(), 0, 0, 0);
-					EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", pApply->cur.joiner.data(), pApply->cur.snum, iter->first.data(), undo.z, pApply->data.data()));
-					blkFree(&undo);
-					bDone = TRUE;
+				collect_apply(_applies, lvl, pApply);
+
+				mApplies::iterator ____iter;
+				vApplies::iterator _____iter;
+
+				for (____iter = _applies.begin(); ____iter != _applies.end(); ____iter++) {
+					for (_____iter = ____iter->second.begin(); _____iter != ____iter->second.end(); _____iter++) {
+						file_uri_replace(sessionId, pJoiner, (*_____iter)->data);
+						sqlite3_exec(pMainDb, (*_____iter)->data.data(), 0, 0, 0);
+						diff_one_table(pMainDb, "main", "aux", iter->first.data(), &undo);
+						sqlite3_exec(pBackDb, (*_____iter)->data.data(), 0, 0, 0);
+						EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", (*_____iter)->cur.joiner.data(), (*_____iter)->cur.snum, iter->first.data(), undo.z, (*_____iter)->data.data()));
+						blkFree(&undo);
+						bDone = TRUE;
+					}
 				}
 				break;
 			);
