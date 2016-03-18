@@ -39,6 +39,8 @@
 #define MOB_SERVICE_OBJECT_PATH "/mobService"
 #define MOB_PORT 27
 
+typedef std::map<qcc::String, bool>	mSignals;
+
 class CSender;
 
 class CAlljoynMob {
@@ -69,12 +71,15 @@ public:
 		return m_pSender->SendData(sSvrName, nFootPrint, nAction, sessionId, msg, nLength, pExtra, nExtLen); 
 	}
 
+	void SetSignal(const char * sJoiner, bool bSignal);
+
 protected:
 	ajn::BusAttachment *	m_pBus;
 	int						m_nSNum;
 	CSender*				m_pSender;
 	SessionId				m_nSessionID;
 	MobBusListener			m_BusListener;
+	mSignals				m_mSignals;
 
 	sqlite3 *				m_pMainDB;
 	sqlite3 *				m_pBackDB;

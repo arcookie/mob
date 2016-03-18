@@ -80,13 +80,15 @@ void MobBusListener::SessionJoined(SessionPort /*sessionPort*/, SessionId id, co
 {
 	m_pMob->SetSessionID(id);
 
+	int snum = 0;
 	sqlite3_stmt *pStmt = NULL;
 	const char * pOwner = m_pMob->GetJoinName();
 
 	QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt, ("SELECT base_table, MAX(snum) AS n FROM works WHERE joiner = %Q;", pOwner),
 		SYNC_SIGNAL ss;
 
-		ss.snum = sqlite3_column_int(pStmt, 1);
+		snum = sqlite3_column_int(pStmt, 1);
+		ss.snum = snum;
 
 		if (ss.snum > 0) {
 			strcpy_s(ss.joiner, sizeof(ss.joiner), pOwner);
@@ -94,6 +96,8 @@ void MobBusListener::SessionJoined(SessionPort /*sessionPort*/, SessionId id, co
 		}
 		break;
 	);
+
+	m_pMob->SetSignal(pOwner, true);
 
 	printf("SessionJoined with %s (id=%d)\n", joiner, id);
 	m_pMob->EnableConcurrentCallbacks();

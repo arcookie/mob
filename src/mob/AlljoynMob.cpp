@@ -94,6 +94,18 @@ sqlite3 * CAlljoynMob::OpenDB(const char *zFilename)
 	return NULL;
 }
 
+void CAlljoynMob::SetSignal(const char * sJoiner, bool bSignal) 
+{ 
+	if (sJoiner) m_mSignals[sJoiner] = bSignal;
+	else {
+		mSignals::iterator iter;
+
+		for (iter = m_mSignals.begin(); iter != m_mSignals.end(); iter++) {
+			iter->second = bSignal;
+		}
+	}
+}
+
 QStatus CAlljoynMob::Init(const char * sSvrName)
 {
 	QStatus status = ER_FAIL;

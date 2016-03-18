@@ -138,6 +138,8 @@ int mob_sync_db(sqlite3 * pDb)
 
 			EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", sd.joiner, sd.snum, (*iter).data(), undo.z, redo.z));
 
+			gpMob->SetSignal(NULL, true);
+
 			alljoyn_send(session_id, NULL, ACT_DATA, redo.z, redo.nUsed + 1, (const char *)&sd, sizeof(SYNC_DATA));
 
 			blkFree(&redo);
