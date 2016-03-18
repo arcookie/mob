@@ -87,7 +87,7 @@ static BOOL save2applies(vApplies & applies, APPLY * pApply)
 
 	applies.push_back(pApply);
 
-	return bAlone;
+	return bAlone || applies.size() == 1;
 }
 
 static APPLY * find_first_apply(vApplies & applies, SKEY & prev)
