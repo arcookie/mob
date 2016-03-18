@@ -94,6 +94,31 @@ sqlite3 * CAlljoynMob::OpenDB(const char *zFilename)
 	return NULL;
 }
 
+BOOL CAlljoynMob::SendSignal()
+{
+	BOOL bSend = FALSE;
+	sqlite3_stmt *pStmt = NULL;
+	qcc::String s = m_pBus->GetUniqueName();
+
+	QUERY_SQL_V(m_pMainDB, pStmt, ("SELECT MAX(snum) AS n FROM works WHERE joiner = %Q;", s.data()),
+		SYNC_SIGNAL ss;
+
+		strcpy_s(ss.joiner, sizeof(ss.joiner), s.data());
+		ss.snum = sqlite3_column_int(pStmt, 0);
+		mSignals::iterator iter;
+
+		for (iter = m_mSignals.begin(); iter != m_mSignals.end(); iter++) {
+			if (iter->second) {
+				alljoyn_send(m_nSessionID, iter->first.data(), ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+				bSend = TRUE;
+			}
+		}
+
+		break;
+	);
+	return bSend;
+}
+
 void CAlljoynMob::SetSignal(const char * sJoiner, bool bSignal) 
 { 
 	if (sJoiner) m_mSignals[sJoiner] = bSignal;

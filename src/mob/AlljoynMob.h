@@ -71,6 +71,7 @@ public:
 		return m_pSender->SendData(sSvrName, nFootPrint, nAction, sessionId, msg, nLength, pExtra, nExtLen); 
 	}
 
+	BOOL SendSignal();
 	void SetSignal(const char * sJoiner, bool bSignal);
 
 protected:

@@ -136,36 +136,6 @@ const qcc::String mem2file(const char * data, int length, const char * sExt)
 	return "";
 }
 
-void CALLBACK fnSendSignal(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWORD /*dwTime*/)
-{
-	KillTimer(NULL, idEvent);
-
-	SYNC_SIGNAL ss;
-	sqlite3_stmt *pStmt = NULL;
-
-	strcpy_s(ss.joiner, sizeof(ss.joiner), gpMob->GetJoinName());
-
-	QUERY_SQL_V(gpMob->GetMainDB(), pStmt, ("SELECT MAX(snum) AS n FROM works WHERE joiner = %Q;", ss.joiner),
-		ss.snum = sqlite3_column_int(pStmt, 0);
-		if (ss.snum != gpMob->GetSerial()) alljoyn_send(gpMob->GetSessionID(), NULL, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
-		break;
-	);
-}
-
-void alljoyn_signal(sqlite3 * pDB, unsigned int nSessionID, const char * pOwner, const char * pTarget)
-{
-	sqlite3_stmt *pStmt = NULL;
-
-	QUERY_SQL_V(pDB, pStmt, ("SELECT MAX(snum) AS n FROM works WHERE joiner = %Q;", pOwner),
-		SYNC_SIGNAL ss;
-
-		ss.snum = sqlite3_column_int(pStmt, 0);
-		strcpy_s(ss.joiner, sizeof(ss.joiner), pOwner);
-		if (ss.snum != gpMob->GetSerial()) alljoyn_send(nSessionID, pTarget, ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
-		break;
-	);
-}
-
 int alljoyn_send(unsigned int nSessionID, const char * pJoiner, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen)
 {
 	time_t footprint = time(NULL);
@@ -197,10 +167,7 @@ int alljoyn_send(unsigned int nSessionID, const char * pJoiner, int nAction, cha
 			}
 			else p++;
 		}
-		if (data.nUsed > 0) {
-			ret = gpMob->SendData(pJoiner, footprint, ACT_FLIST, nSessionID, data.z, data.nUsed);
-		//	SetTimer(NULL, TM_SEND_SIGNAL, INT_SEND_SIGNAL, &fnSendSignal);
-		}
+		if (data.nUsed > 0) ret = gpMob->SendData(pJoiner, footprint, ACT_FLIST, nSessionID, data.z, data.nUsed);
 		else gpMob->SendData(pJoiner, footprint, ACT_END, nSessionID, 0, 0);
 
 		blkFree(&data);
