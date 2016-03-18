@@ -50,7 +50,7 @@ void CSender::MissingCheck(const char * sJoiner /* NULL */, int nSNum /* -1 */)
 
 	FIND_IN_RECV(iter, _iter, __iter, 
 		if ((*__iter)->data.z && (*__iter)->snum > 1) {
-			rcv.snum_end = rcv.snum = (*__iter)->snum - 1;
+			rcv.set((*__iter)->snum - 1, (*__iter)->snum - 1);
 			if (_iter->second.find(&rcv) == _iter->second.end()) {
 				if (miss[_iter->first] != "") miss[_iter->first] += ",";
 				miss[_iter->first] += qcc::I32ToString((*__iter)->snum - 1);
@@ -89,7 +89,7 @@ BOOL CSender::SetMissingTimer()
 
 	FIND_IN_RECV(iter, _iter, __iter,
 		if ((*__iter)->data.z && (*__iter)->snum > 1) {
-			rcv.snum_end = rcv.snum = (*__iter)->snum - 1;
+			rcv.set((*__iter)->snum - 1, (*__iter)->snum - 1);
 			if (_iter->second.find(&rcv) == _iter->second.end()) {
 				SetTimer(NULL, TM_MISSING_CHECK, INT_MISSING_CHECK, &fnMissingCheck);
 				return TRUE;

@@ -130,8 +130,7 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 
 	pRCV->prev.joiner = pSD->joiner_prev;
 	pRCV->prev.snum = pSD->snum_prev;
-	pRCV->snum = pSD->snum;
-	pRCV->snum_end = pSD->snum;
+	pRCV->set(pSD->snum, pSD->snum);
 	blkMove(&pRCV->data, pText);
 
 	m_mReceives[pSD->base_table][pSD->joiner].insert(pRCV);

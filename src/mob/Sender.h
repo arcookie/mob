@@ -80,17 +80,28 @@ typedef struct {
 	Block body;
 } TRAIN;
 
-typedef struct {
+class SKEY {
+public:
+	SKEY() {}
+	SKEY(int s, const char * j) { snum = s; joiner = j; }
+
+	bool operator==(const SKEY &other) const { return snum == other.snum && joiner == other.joiner; }
+
 	int snum;
 	qcc::String joiner;
-} SKEY;
+};
 
-typedef struct {
+class RECEIVE{
+public:
+	RECEIVE() {}
+
+	void set(int sn, int sn_end) { snum = sn; sn_end = snum_end; }
+
 	int snum;
 	int snum_end;
 	SKEY prev;
 	Block data;
-} RECEIVE;
+};
 
 struct CompareRECEIVE
 {

@@ -32,47 +32,96 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // typedef
 
-typedef struct {
-	int snum;
-	std::string data;
-} APPLY;
+class APPLY;
 
-typedef struct {
+struct CompareApply
+{
+	bool operator()(APPLY const * _Left, APPLY const * _Right) const;
+};
+
+typedef std::set<APPLY *, CompareApply>	sApply;
+
+class APPLY {
+public:
+	APPLY(SKEY & p, SKEY & c, const char * d) :prev(p), cur(c), data(d) { parent = NULL; }
+
 	SKEY prev;
-	std::map<qcc::String, APPLY> applies;
-} APPLIES;
+	SKEY cur;
+	std::string	data;
 
-typedef std::vector<APPLIES>			vApplies;
+	APPLY *	parent; 
+	sApply	children;
+};
+
+typedef std::vector<APPLY*>			vApplies;
+
+inline bool CompareApply::operator()(APPLY const * _Left, APPLY const * _Right) const
+{
+	return  _Left->cur.joiner < _Right->cur.joiner;
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // static function
 
-static void save2applies(vApplies & applies, SKEY & prev, const char * pJoiner, int snum, const char * data)
+static BOOL save2applies(vApplies & applies, APPLY * pApply)
+{
+	BOOL bAlone = TRUE;
+	vApplies::iterator iter;
+
+	for (iter = applies.begin(); iter != applies.end(); iter++) {
+		if ((*iter)->cur == pApply->prev) {
+			(*iter)->children.insert(pApply);
+			pApply->parent = (*iter);
+			bAlone = FALSE;
+			break;
+		}
+	}
+
+	for (iter = applies.begin(); iter != applies.end(); iter++) {
+		if ((*iter)->prev == pApply->cur) {
+			(*iter)->parent = pApply;
+			pApply->children.insert(*iter);
+			break;
+		}
+	}
+
+	applies.push_back(pApply);
+
+	return bAlone;
+}
+
+static APPLY * find_first_apply(vApplies & applies, SKEY & prev)
 {
 	vApplies::iterator iter;
 
 	for (iter = applies.begin(); iter != applies.end(); iter++) {
-		if ((*iter).prev.snum == prev.snum && (*iter).prev.joiner == prev.joiner) {
-			(*iter).applies[pJoiner].snum = snum;
-			(*iter).applies[pJoiner].data = data;
-			break;
-		}
+		if ((*iter)->prev == prev) return (*iter);
 	}
-	if (iter == applies.end()) {
-		applies.push_back(APPLIES());
-		applies.back().prev = prev;
-		(*iter).applies[pJoiner].snum = snum;
-		(*iter).applies[pJoiner].data = data;
+	return NULL;
+}
+
+static void delete_applies(vApplies & applies)
+{
+	vApplies::iterator iter;
+
+	for (iter = applies.begin(); iter != applies.end(); iter++) {
+		delete (*iter);
 	}
 }
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CSender
 
 void CSender::Apply(SessionId sessionId, const char * pJoiner)
 {
+	RECEIVE rcv;
+	int undo, n;
 	BOOL bDone = FALSE;
 	mReceives::iterator iter;
+	mReceive::iterator _iter;
+	sReceive::iterator __iter;
+	sReceive::iterator ___iter;
 	sqlite3 * pMainDb = m_pMob->GetMainDB();
 	sqlite3 * pBackDb = m_pMob->GetBackDB();
 	sqlite3 * pUndoDb = m_pMob->GetUndoDB();
@@ -87,25 +136,20 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 
 	for (iter = m_mReceives.begin(); iter != m_mReceives.end(); iter++) {
 		vApplies applies;
-		{
-			RECEIVE rcv;
-			int undo = INT_MAX, n;
-			mReceive::iterator _iter;
-			sReceive::iterator __iter;
-			sReceive::iterator ___iter;
 
-			for (_iter = iter->second.begin(); _iter != iter->second.end(); _iter++) {
-				for (__iter = _iter->second.begin(); __iter != _iter->second.end(); ) {
-					if ((*__iter)->data.z) {
-						QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*__iter)->prev.joiner.data(), (*__iter)->prev.snum, iter->first.data()),
-							if (undo > (n = sqlite3_column_int(pStmt, 0))) undo = n;
-						);
+		undo = INT_MAX;
 
-						save2applies(applies, (*__iter)->prev, _iter->first.data(), (*__iter)->snum, (*__iter)->data.z);
+		for (_iter = iter->second.begin(); _iter != iter->second.end(); _iter++) {
+			for (__iter = _iter->second.begin(); __iter != _iter->second.end(); ) {
+				if ((*__iter)->data.z) {
+					QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*__iter)->prev.joiner.data(), (*__iter)->prev.snum, iter->first.data()),
+						if (undo > (n = sqlite3_column_int(pStmt, 0))) undo = n;
+					);
 
+					if (!save2applies(applies, new APPLY((*__iter)->prev, SKEY((*__iter)->snum, _iter->first.data()), (*__iter)->data.z))) {
 						blkFree(&(*__iter)->data);
 
-						rcv.snum_end = rcv.snum = (*__iter)->snum - 1;
+						rcv.set((*__iter)->snum - 1, (*__iter)->snum - 1);
 
 						if ((___iter = _iter->second.find(&rcv)) != _iter->second.end()) {
 							(*___iter)->snum_end = (*__iter)->snum;
@@ -114,44 +158,44 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 							continue;
 						}
 					}
-					__iter++;
 				}
-			}
-
-			if (undo < INT_MAX) {
-				SKEY prev = { -1, "" };
-
-				QUERY_SQL_V(pUndoDb, pStmt, ("SELECT snum, joiner, redo FROM works WHERE num >= %d AND base_table=%Q ORDER BY num ASC", undo, iter->first.data()),
-					if (prev.snum > 0) save2applies(applies, prev, (const char *)sqlite3_column_text(pStmt, 1), sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 2));
-					prev.snum = sqlite3_column_int(pStmt, 0);
-					prev.joiner = (const char *)sqlite3_column_text(pStmt, 1);
-				);
-				QUERY_SQL_V(pUndoDb, pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", undo, iter->first.data()),
-					sqlite3_exec(pMainDb, (const char *)sqlite3_column_text(pStmt, 0), 0, 0, 0);
-				);
-				EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", undo, iter->first.data()));
+				__iter++;
 			}
 		}
 
-		{
+		if (undo < INT_MAX) {
+			SKEY prev = { -1, "" };
+
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT snum, joiner, redo FROM works WHERE num >= %d AND base_table=%Q ORDER BY num ASC", undo, iter->first.data()),
+				if (prev.snum > 0) save2applies(applies, new APPLY(prev, SKEY(sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 1)), (const char *)sqlite3_column_text(pStmt, 2)));
+				prev.snum = sqlite3_column_int(pStmt, 0);
+				prev.joiner = (const char *)sqlite3_column_text(pStmt, 1);
+			);
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", undo, iter->first.data()),
+				sqlite3_exec(pMainDb, (const char *)sqlite3_column_text(pStmt, 0), 0, 0, 0);
+			);
+			EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", undo, iter->first.data()));
+
 			Block undo;
-			vApplies::iterator _iter;
-			std::map<qcc::String, APPLY>::iterator __iter;
 
 			blkInit(&undo);
 
-			for (_iter = applies.begin(); _iter != applies.end(); _iter++) {
-				for (__iter = (*_iter).applies.begin(); __iter != (*_iter).applies.end(); __iter++) {
-					file_uri_replace(sessionId, pJoiner, __iter->second.data);
-					sqlite3_exec(pMainDb, __iter->second.data.data(), 0, 0, 0);
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT snum, joiner FROM works WHERE num == %d AND base_table=%Q LIMIT 1", undo, iter->first.data()),
+				APPLY * pApply = find_first_apply(applies, SKEY(sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 1)));
+
+				while (pApply) {
+					file_uri_replace(sessionId, pJoiner, pApply->data);
+					sqlite3_exec(pMainDb, pApply->data.data(), 0, 0, 0);
 					diff_one_table(pMainDb, "main", "aux", iter->first.data(), &undo);
-					sqlite3_exec(pBackDb, __iter->second.data.data(), 0, 0, 0);
-					EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", __iter->first.data(), __iter->second.snum, iter->first.data(), undo.z, __iter->second.data.data()));
+					sqlite3_exec(pBackDb, pApply->data.data(), 0, 0, 0);
+					EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", pApply->cur.joiner.data(), pApply->cur.snum, iter->first.data(), undo.z, pApply->data.data()));
 					blkFree(&undo);
 					bDone = TRUE;
 				}
-			}
+				break;
+			);
 		}
+		delete_applies(applies);
 	}
 	if (bDone && fnReceiveProc) fnReceiveProc(pMainDb);
 }
