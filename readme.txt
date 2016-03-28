@@ -1,4 +1,6 @@
 
+-- The release date of the first version (ver. 0.1) is early april 2016. --
+
 This project is to make a library which make all functionities of one program that based on SQLite DB to multi-users real-time collaboratable.  
 
 This project is open source version of commercial module(that couldn't be opened), which made with same paradigm, not same source code, so it has no simularity in source code.
