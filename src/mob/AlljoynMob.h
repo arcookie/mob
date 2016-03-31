@@ -60,7 +60,7 @@ public:
 	int GetSerial() { return m_nSNum; }
 	void MissingCheck()	{ m_pSender->MissingCheck(); }
 	SessionId GetSessionID() { return m_nSessionID; }
-	void SetSessionID(SessionId id) { m_nSessionID = id; }
+	void SetSessionID(SessionId id) { if (!m_nSessionID) m_nSessionID = id; }
 	const char * GetJoinName() { return m_pBus->GetUniqueName().data(); }
 	void EnableConcurrentCallbacks() { m_pBus->EnableConcurrentCallbacks(); }
 	QStatus JoinSession(const char* sessionHost, SessionPort sessionPort, SessionListener* listener, SessionId& sessionId, SessionOpts& opts) {

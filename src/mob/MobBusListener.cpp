@@ -79,11 +79,10 @@ void MobBusListener::FoundAdvertisedName(const char* name, TransportMask transpo
 void MobBusListener::SessionJoined(SessionPort /*sessionPort*/, SessionId id, const char* joiner)
 {
 	m_pMob->SetSessionID(id);
+	m_pMob->SetSignal(joiner, true);
 
 	sqlite3_stmt *pStmt = NULL;
 	const char * pOwner = m_pMob->GetJoinName();
-
-	m_pMob->SetSignal(pOwner, true);
 
 	QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt, ("SELECT base_table, MAX(snum) AS n FROM works WHERE joiner = %Q;", pOwner),
 		SYNC_SIGNAL ss;

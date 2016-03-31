@@ -116,7 +116,7 @@ int mob_sync_db(sqlite3 * pDb)
 	sqlite3_finalize(pStmt);
 
 	strcpy_s(sd.joiner, sizeof(sd.joiner), gpMob->GetJoinName());
-	strcpy_s(sd.joiner_prev, sizeof(sd.joiner_prev), sd.joiner);
+	memset(sd.joiner_prev, 0, sizeof(sd.joiner_prev));
 
 	for (iter = tables.begin(); iter != tables.end(); iter++) {
 		strcpy_s(sd.base_table, sizeof(sd.base_table), (*iter).data());

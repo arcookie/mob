@@ -95,8 +95,8 @@ class RECEIVE{
 public:
 	RECEIVE() {}
 
-	void set(int sn, int sn_end) { snum = sn; sn_end = snum_end; }
-
+	void set(int sn, int sn_end) { snum = sn; snum_end = sn_end; }
+	 
 	int snum;
 	int snum_end;
 	SKEY prev;

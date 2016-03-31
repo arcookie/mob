@@ -145,7 +145,6 @@ void CSender::OnDataEnd(int footprint, const char * pJoiner)
 
 	if ((iter = m_mStation[pJoiner].find(footprint)) != m_mStation[pJoiner].end()){
 		Save(sessionId, pJoiner, &(iter->second.body), iter->second.extra, TRAIN_EXTRA_LEN);
-		blkFree(&(iter->second.body));
 		m_mStation[pJoiner].erase(iter);
 	}
 }

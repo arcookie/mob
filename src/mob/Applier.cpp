@@ -153,9 +153,11 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 		for (_iter = iter->second.begin(); _iter != iter->second.end(); _iter++) {
 			for (__iter = _iter->second.begin(); __iter != _iter->second.end(); ) {
 				if ((*__iter)->data.z) {
-					QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*__iter)->prev.joiner.data(), (*__iter)->prev.snum, iter->first.data()),
+					if ((*__iter)->prev.snum > 0) {
+						QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*__iter)->prev.joiner.data(), (*__iter)->prev.snum, iter->first.data()),
 						if (undo > (n = sqlite3_column_int(pStmt, 0))) undo = n;
-					);
+						);
+					}
 
 					if (!save2applies(applies, new APPLY((*__iter)->prev, SKEY((*__iter)->snum, _iter->first.data()), (*__iter)->data.z))) {
 						blkFree(&(*__iter)->data);
@@ -174,6 +176,8 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 			}
 		}
 
+		SKEY first_key = { -1, "" };
+
 		if (undo < INT_MAX) {
 			SKEY prev = { -1, "" };
 
@@ -187,32 +191,33 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 			);
 			EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", undo, iter->first.data()));
 
-			Block undo;
-
-			blkInit(&undo);
-
 			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT snum, joiner FROM works WHERE num == %d AND base_table=%Q LIMIT 1", undo, iter->first.data()),
-				mApplies _applies;
-
-				collect_apply(_applies, 0, find_first_apply(applies, SKEY(sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 1))));
-
-				mApplies::iterator ____iter;
-				vApplies::iterator _____iter;
-
-				for (____iter = _applies.begin(); ____iter != _applies.end(); ____iter++) {
-					for (_____iter = ____iter->second.begin(); _____iter != ____iter->second.end(); _____iter++) {
-						file_uri_replace(sessionId, pJoiner, (*_____iter)->data);
-						sqlite3_exec(pMainDb, (*_____iter)->data.data(), 0, 0, 0);
-						diff_one_table(pMainDb, "main", "aux", iter->first.data(), &undo);
-						sqlite3_exec(pBackDb, (*_____iter)->data.data(), 0, 0, 0);
-						EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", (*_____iter)->cur.joiner.data(), (*_____iter)->cur.snum, iter->first.data(), undo.z, (*_____iter)->data.data()));
-						blkFree(&undo);
-						bDone = TRUE;
-					}
-				}
+				first_key = SKEY(sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 1));
 				break;
 			);
 		}
+
+		Block undo;
+		mApplies _applies;
+		mApplies::iterator ____iter;
+		vApplies::iterator _____iter;
+
+		blkInit(&undo);
+
+		collect_apply(_applies, 0, find_first_apply(applies, first_key));
+
+		for (____iter = _applies.begin(); ____iter != _applies.end(); ____iter++) {
+			for (_____iter = ____iter->second.begin(); _____iter != ____iter->second.end(); _____iter++) {
+				file_uri_replace(sessionId, pJoiner, (*_____iter)->data);
+				sqlite3_exec(pMainDb, (*_____iter)->data.data(), 0, 0, 0);
+				diff_one_table(pMainDb, "main", "aux", iter->first.data(), &undo);
+				sqlite3_exec(pBackDb, (*_____iter)->data.data(), 0, 0, 0);
+				EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", (*_____iter)->cur.joiner.data(), (*_____iter)->cur.snum, iter->first.data(), undo.z, (*_____iter)->data.data()));
+				blkFree(&undo);
+				bDone = TRUE;
+			}
+		}
+
 		delete_applies(applies);
 	}
 	if (bDone && fnReceiveProc) fnReceiveProc(pMainDb);
