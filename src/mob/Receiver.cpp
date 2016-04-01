@@ -138,6 +138,31 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 	if (!SetMissingTimer()) Apply(sessionId, pJoiner);
 }
 
+void CSender::SaveFileInfo(SessionId sessionId, const char * pJoiner, const char * sPath, const FILE_SEND_ITEM * pFSI)
+{
+	if (pFSI) {
+		vRecvFiles::iterator _iter;
+
+		if ((_iter = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, pFSI->uri))) != gRecvFiles.end()) {
+			(*_iter)->fsize = pFSI->fsize;
+			(*_iter)->mtime = pFSI->mtime;
+			(*_iter)->path = sPath;
+		}
+		else {
+			FILE_RECV_ITEM * pFRI = new FILE_RECV_ITEM;
+
+			pFRI->fsize = pFSI->fsize;
+			pFRI->mtime = pFSI->mtime;
+			pFRI->uri = pFSI->uri;
+			pFRI->joiner = pJoiner;
+			pFRI->session_id = sessionId;
+			pFRI->path = sPath;
+
+			gRecvFiles.push_back(pFRI);
+		}
+	}
+}
+
 void CSender::OnDataEnd(int footprint, const char * pJoiner)
 {
 	mTrain::iterator iter;
@@ -265,32 +290,8 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 				blkFree(&(iter->second.body));
 				break;
 			case ACT_FILE:
-			{
-				FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.extra;
-
-				if (pFSI) {
-					vRecvFiles::iterator _iter;
-
-					if ((_iter = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, pFSI->uri))) != gRecvFiles.end()) {
-						(*_iter)->fsize = pFSI->fsize;
-						(*_iter)->mtime = pFSI->mtime;
-						(*_iter)->path = iter->second.path;
-					}
-					else {
-						FILE_RECV_ITEM * pFRI = new FILE_RECV_ITEM;
-
-						pFRI->fsize = pFSI->fsize;
-						pFRI->mtime = pFSI->mtime;
-						pFRI->uri = pFSI->uri;
-						pFRI->joiner = pJoiner;
-						pFRI->session_id = sessionId;
-						pFRI->path = iter->second.path;
-
-						gRecvFiles.push_back(pFRI);
-					}
-				}
+				SaveFileInfo(sessionId, pJoiner, iter->second.path.data(), (FILE_SEND_ITEM *)iter->second.extra);
 				break;
-			}
 			default:
 				blkFree(&(iter->second.body));
 				break;

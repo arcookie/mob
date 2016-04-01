@@ -157,6 +157,7 @@ public:
 
 public:
 	~CSender();
+	void SaveFileInfo(SessionId sessionId, const char * pJoiner, const char * sPath, const FILE_SEND_ITEM * pFSI);
 	void Save(SessionId sessionId, const char * pJoiner, Block * pText, const char * pExtra, int nExtLen);
 	void OnDataEnd(int footprint, const char * pJoiner);
 	void OnRecvData(const InterfaceDescription::Member* pMember, const char* srcPath, Message& msg);
