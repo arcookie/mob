@@ -266,25 +266,28 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 				break;
 			case ACT_FILE:
 			{
-				vRecvFiles::iterator _iter;
 				FILE_SEND_ITEM * pFSI = (FILE_SEND_ITEM *)iter->second.extra;
 
 				if (pFSI) {
-					FILE_RECV_ITEM * pFRI = new FILE_RECV_ITEM;
+					vRecvFiles::iterator _iter;
 
 					if ((_iter = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, pFSI->uri))) != gRecvFiles.end()) {
-						delete (*_iter);
-						gRecvFiles.erase(_iter);
+						(*_iter)->fsize = pFSI->fsize;
+						(*_iter)->mtime = pFSI->mtime;
+						(*_iter)->path = iter->second.path;
 					}
+					else {
+						FILE_RECV_ITEM * pFRI = new FILE_RECV_ITEM;
 
-					pFRI->fsize = pFSI->fsize;
-					pFRI->mtime = pFSI->mtime;
-					pFRI->uri = pFSI->uri;
-					pFRI->joiner = pJoiner;
-					pFRI->session_id = sessionId;
-					pFRI->path = iter->second.path;
+						pFRI->fsize = pFSI->fsize;
+						pFRI->mtime = pFSI->mtime;
+						pFRI->uri = pFSI->uri;
+						pFRI->joiner = pJoiner;
+						pFRI->session_id = sessionId;
+						pFRI->path = iter->second.path;
 
-					gRecvFiles.push_back(pFRI);
+						gRecvFiles.push_back(pFRI);
+					}
 				}
 				break;
 			}
