@@ -93,13 +93,13 @@ void CALLBACK fnMissingCheck(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWO
 
 BOOL CSender::SetMissingTimer()
 {
-	mReceive::iterator b; sReceive::reverse_iterator c; 
+	mReceive::iterator b; sReceive::reverse_iterator c;
 
 	for (b = m_mReceives.begin(); b != m_mReceives.end(); b++) {
 		for (c = b->second.rbegin(); c != b->second.rend(); ) {
 			if ((*c)->data.z) {
-				int sn = (*c++)->snum - 1; 
-				printf("%d\n", sn);
+				int sn = (*c++)->snum - 1;
+				if (c != b->second.rend()) printf("%d (%d %d)\n", sn, (*c)->snum, (*c)->snum_end);
 				if ((c == b->second.rend() && sn > 0) || (c != b->second.rend() && sn != (*c)->snum_end)) {
 					SetTimer(NULL, TM_MISSING_CHECK, INT_MISSING_CHECK, &fnMissingCheck);
 					return TRUE;

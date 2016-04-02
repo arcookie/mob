@@ -133,7 +133,7 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 
 	m_mReceives[pSD->joiner].insert(pRCV);
 
-	if (!SetMissingTimer());// Apply(sessionId, pJoiner);
+	if (!SetMissingTimer()) Apply(sessionId, pJoiner);
 }
 
 void CSender::SaveFileInfo(SessionId sessionId, const char * pJoiner, const char * sPath, const FILE_SEND_ITEM * pFSI)
