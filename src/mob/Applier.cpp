@@ -108,6 +108,16 @@ static APPLY * find_first_apply(vApplies & applies, SKEY & prev)
 	return NULL;
 }
 
+static APPLY * find_first_apply(vApplies & applies)
+{
+	vApplies::iterator iter;
+
+	for (iter = applies.begin(); iter != applies.end(); iter++) {
+		if ((*iter)->parent == NULL) return (*iter);
+	}
+	return NULL;
+}
+
 static void delete_applies(vApplies & applies)
 {
 	vApplies::iterator iter;
@@ -151,7 +161,7 @@ static BOOL applies_db(sqlite3 * pMainDb, sqlite3 * pBackDb, sqlite3 * pUndoDb, 
 	msApplies::iterator msiter;
 
 	for (msiter = applies.begin(); msiter != applies.end(); msiter++) {
-		if ((pApply = find_first_apply(msiter->second, root[msiter->first].skey)) != NULL) {
+		if ((pApply = root.size() > 0 ? find_first_apply(msiter->second, root[msiter->first].skey) : find_first_apply(msiter->second)) != NULL) {
 			mApplies _applies;
 
 			collect_apply(_applies, 0, pApply);
@@ -197,8 +207,8 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 		for (siter = miter->second.begin(); siter != miter->second.end();) {
 			if ((*siter)->data.z) {
 				if ((*siter)->prev.snum > 0) {
-					if (root.find((*siter)->base_table) == root.end()) root[(*siter)->base_table].num = INT_MAX;
 					QUERY_SQL_V(pUndoDB, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d", (*siter)->prev.joiner.data(), (*siter)->prev.snum),
+						if (root.find((*siter)->base_table) == root.end()) root[(*siter)->base_table].num = INT_MAX;
 						if (root[(*siter)->base_table].num > (n = sqlite3_column_int(pStmt, 0))) {
 							root[(*siter)->base_table].num = n;
 							root[(*siter)->base_table].skey = (*siter)->prev;
