@@ -131,7 +131,7 @@ int mob_sync_db(sqlite3 * pDb)
 			);
 
 			sd.snum = 1;
-			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT (MAX(snum) + 1) AS sn FROM works WHERE joiner = %Q AND base_table = %Q;", sd.joiner, sd.base_table), 
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT (MAX(snum) + 1) AS sn FROM works WHERE joiner = %Q;", sd.joiner), 
 				int n = sqlite3_column_int(pStmt, 0);
 				if (n > 0) sd.snum = n;
 				break;

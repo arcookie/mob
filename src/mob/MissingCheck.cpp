@@ -33,47 +33,55 @@
 #include "AlljoynMob.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// define
-
-#define FIND_IN_RECV(a,b,c,...)	{mReceives::iterator a; mReceive::iterator b; sReceive::iterator c; \
-	for (a = m_mReceives.begin(); a != m_mReceives.end(); a++) { for (b = a->second.begin(); b != a->second.end(); b++) {\
-	for (c = b->second.begin(); c != b->second.end(); c++) { __VA_ARGS__ }}}}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CSender
 
 void CSender::MissingCheck(const char * sJoiner /* NULL */, int nSNum /* -1 */)
 {
-	int n = 0;
-	RECEIVE rcv;
-	std::map<qcc::String, qcc::String> miss;
+	mReceive::iterator b; sReceive::reverse_iterator c;
 
-	FIND_IN_RECV(iter, _iter, __iter, 
-		if ((*__iter)->data.z && (*__iter)->snum > 1) {
-			rcv.set((*__iter)->snum - 1, (*__iter)->snum - 1);
-			if (_iter->second.find(&rcv) == _iter->second.end()) {
-				if (miss[_iter->first] != "") miss[_iter->first] += ",";
-				miss[_iter->first] += qcc::I32ToString((*__iter)->snum - 1);
+	for (b = m_mReceives.begin(); b != m_mReceives.end(); b++) {
+		qcc::String miss;
+
+		for (c = b->second.rbegin(); c != b->second.rend(); c++) {
+			if ((*c)->data.z) {
+				int sn_end = -1;
+				int sn = (*c++)->snum - 1;
+
+				if (c == b->second.rend() && sn > 0) sn_end = 0;
+				else if(c != b->second.rend() && sn != (*c)->snum_end) sn_end = (*c)->snum_end;
+
+				if (sn_end >= 0) {
+					while (sn > sn_end) {
+						if (miss != "") miss += ",";
+						miss += qcc::I32ToString(sn);
+						--sn;
+					}
+				}
 			}
-			else if (sJoiner && _iter->first == sJoiner && n < (*__iter)->snum) n = (*__iter)->snum;
+			else break;
 		}
-	);
 
-	if (sJoiner) {
-		while (++n <= nSNum) {
-			if (miss[sJoiner] != "") miss[sJoiner] += ",";
-			miss[sJoiner] += qcc::I32ToString(n);
+		if (sJoiner && b->first == sJoiner && nSNum > 0) {
+			if ((c = b->second.rbegin()) == b->second.rend()) {
+				int n = 0;
+
+				while (++n <= nSNum) {
+					if (miss != "") miss += ",";
+					miss += qcc::I32ToString(n);
+				}
+			}
+			else {
+				int n = (*c)->snum_end;
+
+				while (++n <= nSNum) {
+					if (miss != "") miss += ",";
+					miss += qcc::I32ToString(n);
+				}
+			}
 		}
+		if (!miss.empty()) m_pMob->SendData(b->first.data(), time(NULL), ACT_MISSING, m_pMob->GetSessionID(), miss.data(), miss.size());
+		else if (sJoiner && b->first == sJoiner) m_pMob->SendData(sJoiner, time(NULL), ACT_NO_MISSING, m_pMob->GetSessionID(), 0, 0);
 	}
-
-	if (!miss.empty()) {
-		std::map<qcc::String, qcc::String>::iterator iter;
-
-		for (iter = miss.begin(); iter != miss.end(); iter++) {
-			m_pMob->SendData(iter->first.data(), time(NULL), ACT_MISSING, m_pMob->GetSessionID(), iter->second.data(), iter->second.size());
-		}
-	}
-	else if (sJoiner) m_pMob->SendData(sJoiner, time(NULL), ACT_NO_MISSING, m_pMob->GetSessionID(), 0, 0);
 }
 
 void CALLBACK fnMissingCheck(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWORD /*dwTime*/)
@@ -85,17 +93,20 @@ void CALLBACK fnMissingCheck(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWO
 
 BOOL CSender::SetMissingTimer()
 {
-	RECEIVE rcv;
+	mReceive::iterator b; sReceive::reverse_iterator c; 
 
-	FIND_IN_RECV(iter, _iter, __iter,
-		if ((*__iter)->data.z && (*__iter)->snum > 1) {
-			rcv.set((*__iter)->snum - 1, (*__iter)->snum - 1);
-			if (_iter->second.find(&rcv) == _iter->second.end()) {
-				SetTimer(NULL, TM_MISSING_CHECK, INT_MISSING_CHECK, &fnMissingCheck);
-				return TRUE;
+	for (b = m_mReceives.begin(); b != m_mReceives.end(); b++) {
+		for (c = b->second.rbegin(); c != b->second.rend(); c++) {
+			if ((*c)->data.z) {
+				int sn = (*c++)->snum - 1; 
+				if ((c == b->second.rend() && sn > 0) || (c != b->second.rend() && sn != (*c)->snum_end)) {
+					SetTimer(NULL, TM_MISSING_CHECK, INT_MISSING_CHECK, &fnMissingCheck);
+					return TRUE;
+				}
 			}
+			else break;
 		}
-	);
+	}
 
 	return FALSE;
 }

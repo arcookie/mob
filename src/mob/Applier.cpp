@@ -127,9 +127,8 @@ static void collect_apply(mApplies & applies, int level, APPLY * pApply)
 void CSender::Apply(SessionId sessionId, const char * pJoiner)
 {
 	RECEIVE rcv;
-	int undo, n;
+	int u, n;
 	BOOL bDone = FALSE;
-	mReceives::iterator iter;
 	mReceive::iterator _iter;
 	sReceive::iterator __iter;
 	sReceive::iterator ___iter;
@@ -145,17 +144,17 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 
 	sqlite3_finalize(pStmt);
 
-	for (iter = m_mReceives.begin(); iter != m_mReceives.end(); iter++) {
+	{
 		vApplies applies;
 
-		undo = INT_MAX;
+		u = INT_MAX;
 
-		for (_iter = iter->second.begin(); _iter != iter->second.end(); _iter++) {
+		for (_iter = m_mReceives.begin(); _iter != m_mReceives.end(); _iter++) {
 			for (__iter = _iter->second.begin(); __iter != _iter->second.end(); ) {
 				if ((*__iter)->data.z) {
 					if ((*__iter)->prev.snum > 0) {
-						QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*__iter)->prev.joiner.data(), (*__iter)->prev.snum, iter->first.data()),
-						if (undo > (n = sqlite3_column_int(pStmt, 0))) undo = n;
+						QUERY_SQL_V(pUndoDb, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d AND base_table=%Q", (*__iter)->prev.joiner.data(), (*__iter)->prev.snum, (*__iter)->base_table.data()),
+							if (u > (n = sqlite3_column_int(pStmt, 0))) u = n;
 						);
 					}
 
@@ -178,20 +177,20 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 
 		SKEY first_key = { -1, "" };
 
-		if (undo < INT_MAX) {
+		if (u < INT_MAX) {
 			SKEY prev = { -1, "" };
 
-			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT snum, joiner, redo FROM works WHERE num >= %d AND base_table=%Q ORDER BY num ASC", undo, iter->first.data()),
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT snum, joiner, redo FROM works WHERE num >= %d AND base_table=%Q ORDER BY num ASC", u, (*__iter)->base_table.data()),
 				if (prev.snum > 0) save2applies(applies, new APPLY(prev, SKEY(sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 1)), (const char *)sqlite3_column_text(pStmt, 2)));
 				prev.snum = sqlite3_column_int(pStmt, 0);
 				prev.joiner = (const char *)sqlite3_column_text(pStmt, 1);
 			);
-			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", undo, iter->first.data()),
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", u, (*__iter)->base_table.data()),
 				sqlite3_exec(pMainDb, (const char *)sqlite3_column_text(pStmt, 0), 0, 0, 0);
 			);
-			EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", undo, iter->first.data()));
+			EXECUTE_SQL_V(pMainDb, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", u, (*__iter)->base_table.data()));
 
-			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT snum, joiner FROM works WHERE num == %d AND base_table=%Q LIMIT 1", undo, iter->first.data()),
+			QUERY_SQL_V(pUndoDb, pStmt, ("SELECT snum, joiner FROM works WHERE num == %d AND base_table=%Q LIMIT 1", u, (*__iter)->base_table.data()),
 				first_key = SKEY(sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 1));
 				break;
 			);
@@ -210,9 +209,9 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 			for (_____iter = ____iter->second.begin(); _____iter != ____iter->second.end(); _____iter++) {
 				file_uri_replace(sessionId, pJoiner, (*_____iter)->data);
 				sqlite3_exec(pMainDb, (*_____iter)->data.data(), 0, 0, 0);
-				diff_one_table(pMainDb, "main", "aux", iter->first.data(), &undo);
+				diff_one_table(pMainDb, "main", "aux", (*__iter)->base_table.data(), &undo);
 				sqlite3_exec(pBackDb, (*_____iter)->data.data(), 0, 0, 0);
-				EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", (*_____iter)->cur.joiner.data(), (*_____iter)->cur.snum, iter->first.data(), undo.z, (*_____iter)->data.data()));
+				EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", (*_____iter)->cur.joiner.data(), (*_____iter)->cur.snum, (*__iter)->base_table.data(), undo.z, (*_____iter)->data.data()));
 				blkFree(&undo);
 				bDone = TRUE;
 			}

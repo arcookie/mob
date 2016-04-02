@@ -100,6 +100,7 @@ public:
 	int snum;
 	int snum_end;
 	SKEY prev;
+	qcc::String base_table;
 	Block data;
 };
 
@@ -115,7 +116,6 @@ typedef std::map<int, TRAIN>				mTrain;
 typedef std::map<qcc::String, mTrain>		mTrains;
 typedef std::set<RECEIVE*, CompareRECEIVE>	sReceive;  // key to compare is snum range
 typedef std::map<qcc::String, sReceive>		mReceive;  // key is joiner name
-typedef std::map<qcc::String, mReceive>		mReceives; // key is table name
 
 class CAlljoynMob;
 
@@ -130,7 +130,7 @@ public:
 
 private:
 	CAlljoynMob *	m_pMob;
-	mReceives		m_mReceives;
+	mReceive		m_mReceives;
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sender.cpp
