@@ -42,7 +42,7 @@ void CSender::MissingCheck(const char * sJoiner /* NULL */, int nSNum /* -1 */)
 	for (b = m_mReceives.begin(); b != m_mReceives.end(); b++) {
 		qcc::String miss;
 
-		for (c = b->second.rbegin(); c != b->second.rend(); c++) {
+		for (c = b->second.rbegin(); c != b->second.rend(); ) {
 			if ((*c)->data.z) {
 				int sn_end = -1;
 				int sn = (*c++)->snum - 1;
@@ -96,9 +96,10 @@ BOOL CSender::SetMissingTimer()
 	mReceive::iterator b; sReceive::reverse_iterator c; 
 
 	for (b = m_mReceives.begin(); b != m_mReceives.end(); b++) {
-		for (c = b->second.rbegin(); c != b->second.rend(); c++) {
+		for (c = b->second.rbegin(); c != b->second.rend(); ) {
 			if ((*c)->data.z) {
 				int sn = (*c++)->snum - 1; 
+				printf("%d\n", sn);
 				if ((c == b->second.rend() && sn > 0) || (c != b->second.rend() && sn != (*c)->snum_end)) {
 					SetTimer(NULL, TM_MISSING_CHECK, INT_MISSING_CHECK, &fnMissingCheck);
 					return TRUE;
