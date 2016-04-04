@@ -78,6 +78,17 @@ void MobBusListener::FoundAdvertisedName(const char* name, TransportMask transpo
 
 void MobBusListener::SessionJoined(SessionPort /*sessionPort*/, SessionId id, const char* joiner)
 {
+	printf("SessionJoined with %s (id=%d)\n", joiner, id);
+	m_pMob->EnableConcurrentCallbacks();
+	uint32_t timeout = 20;
+	QStatus status = m_pMob->SetLinkTimeout(m_pMob->GetSessionID(), timeout);
+	if (ER_OK == status) {
+		printf("Set link timeout to %d\nsqlite> ", timeout);
+	}
+	else {
+		printf("Set link timeout failed\nsqlite> ");
+	}
+
 	m_pMob->SetSessionID(id);
 	m_pMob->SetSignal(joiner, true);
 
@@ -90,15 +101,4 @@ void MobBusListener::SessionJoined(SessionPort /*sessionPort*/, SessionId id, co
 	);
 
 	if (!signal.empty()) alljoyn_send(id, joiner, ACT_SIGNAL, signal.data(), signal.size() + 1);
-
-	printf("SessionJoined with %s (id=%d)\n", joiner, id);
-	m_pMob->EnableConcurrentCallbacks();
-	uint32_t timeout = 20;
-	QStatus status = m_pMob->SetLinkTimeout(m_pMob->GetSessionID(), timeout);
-	if (ER_OK == status) {
-		printf("Set link timeout to %d\nsqlite> ", timeout);
-	}
-	else {
-		printf("Set link timeout failed\nsqlite> ");
-	}
 }

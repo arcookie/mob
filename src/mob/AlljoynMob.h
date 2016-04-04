@@ -74,6 +74,8 @@ public:
 	BOOL SendSignal();
 	void SetSignal(const char * sJoiner, bool bSignal);
 
+	BOOL IsConnected()	{ return (m_mSignals.begin() != m_mSignals.end()); }
+
 protected:
 	qcc::String				m_sSvrName;
 	ajn::BusAttachment *	m_pBus;
