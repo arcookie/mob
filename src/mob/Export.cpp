@@ -92,7 +92,7 @@ void mob_close_db(sqlite3 * pDb)
 	gpMob->CloseDB();
 }
 
-void CALLBACK fnSendSignal(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWORD /*dwTime*/)
+void CALLBACK fnSendSignal(HWND /*hwnd*/, UINT /*uMsg*/, UINT idEvent, DWORD /*dwTime*/)
 {
 	if (!gpMob->SendSignal()) KillTimer(NULL, idEvent);
 }
@@ -146,11 +146,12 @@ int mob_sync_db(sqlite3 * pDb)
 
 			EXECUTE_SQL_V(pUndoDb, ("INSERT INTO works (joiner, snum, base_table, undo, redo) VALUES (%Q, %d, %Q, %Q, %Q);", sd.joiner, sd.snum, (*iter).data(), undo.z, redo.z));
 
-			alljoyn_send(session_id, NULL, ACT_DATA, redo.z, redo.nUsed + 1, (const char *)&sd, sizeof(SYNC_DATA));
+			if (gpMob->IsConnected()) {
+				alljoyn_send(session_id, NULL, ACT_DATA, redo.z, redo.nUsed + 1, (const char *)&sd, sizeof(SYNC_DATA));
 
-			gpMob->SetSignal(NULL, true);
-			SetTimer(NULL, TM_SEND_SIGNAL, INT_SEND_SIGNAL, &fnSendSignal);
-
+				gpMob->SetSignal(NULL, true);
+				SetTimer(NULL, TM_SEND_SIGNAL, INT_SEND_SIGNAL, (TIMERPROC)&fnSendSignal);
+			}
 			blkFree(&redo);
 			blkFree(&undo);
 		}

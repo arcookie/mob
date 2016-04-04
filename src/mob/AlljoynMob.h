@@ -75,6 +75,7 @@ public:
 	void SetSignal(const char * sJoiner, bool bSignal);
 
 	BOOL IsConnected()	{ return (m_mSignals.begin() != m_mSignals.end()); }
+	void RemoveSignalMember(const char * sJoiner) { mSignals::iterator iter = m_mSignals.find(sJoiner); if (iter != m_mSignals.end()) m_mSignals.erase(iter); }
 
 protected:
 	qcc::String				m_sSvrName;

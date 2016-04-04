@@ -101,22 +101,19 @@ BOOL CAlljoynMob::SendSignal()
 	sqlite3_stmt *pStmt = NULL;
 	qcc::String s = m_pBus->GetUniqueName();
 
-	QUERY_SQL_V(m_pMainDB, pStmt, ("SELECT MAX(snum) AS n FROM works WHERE joiner = %Q;", s.data()),
-		SYNC_SIGNAL ss;
-
-		strcpy_s(ss.joiner, sizeof(ss.joiner), s.data());
-		ss.snum = sqlite3_column_int(pStmt, 0);
+	QUERY_SQL_V(m_pUndoDB, pStmt, ("SELECT ';' || max(snum) || '@' || joiner FROM works WHERE joiner = %Q;", s.data()),
 		mSignals::iterator iter;
+		qcc::String signal = (const char *)sqlite3_column_text(pStmt, 0);
 
 		for (iter = m_mSignals.begin(); iter != m_mSignals.end(); iter++) {
 			if (iter->second) {
-				alljoyn_send(m_nSessionID, iter->first.data(), ACT_SIGNAL, 0, 0, (const char *)&ss, sizeof(SYNC_SIGNAL));
+				alljoyn_send(m_nSessionID, iter->first.data(), ACT_SIGNAL, signal.data(), signal.size() + 1);
 				bSend = TRUE;
 			}
 		}
-
 		break;
 	);
+
 	return bSend;
 }
 
