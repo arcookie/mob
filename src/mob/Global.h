@@ -94,7 +94,7 @@ extern qcc::String get_path(const char * uri);
 extern long get_file_length(const char * sPath);
 extern const qcc::String get_unique_path(const char * sExt);
 extern const qcc::String mem2file(const char * data, int length, const char * sExt);
-extern int alljoyn_send(unsigned int nSID, const char * pJoiner, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen);
+extern int alljoyn_send(unsigned int nSID, const char * pJoiner, int nAction, const char * sText, int nLength, const char * pExtra = NULL, int nExtLen = 0);
 
 #endif /* _GLOBAL_H_ */
 

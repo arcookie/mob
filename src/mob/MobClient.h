@@ -32,9 +32,9 @@
 
 class CMobClient : public CAlljoynMob {
 public:
-	CMobClient() { m_bJoinComplete = false; }
+	CMobClient(const char * sSvrName) : CAlljoynMob(sSvrName) { m_bJoinComplete = false; }
 
-	virtual QStatus Init(const char * sSvrName);
+	virtual QStatus Connect();
 
 	void SetSessionHost(const char * sSessionHost) { m_sSessionHost = sSessionHost; }
 	void SetJoinComplete(bool bJoinComplete) { m_bJoinComplete = bJoinComplete; }

@@ -35,7 +35,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CAlljoynMob
 
-CAlljoynMob::CAlljoynMob() 
+CAlljoynMob::CAlljoynMob(const char * sSvrName)
 {
 	m_pBus = NULL;
 	m_nSNum = 0;
@@ -44,6 +44,7 @@ CAlljoynMob::CAlljoynMob()
 	m_pMainDB = NULL;
 	m_pBackDB = NULL;
 	m_pUndoDB = NULL;
+	m_sSvrName = sSvrName;
 }
 
 CAlljoynMob::~CAlljoynMob() 
@@ -131,7 +132,7 @@ void CAlljoynMob::SetSignal(const char * sJoiner, bool bSignal)
 	}
 }
 
-QStatus CAlljoynMob::Init(const char * sSvrName)
+QStatus CAlljoynMob::Connect()
 {
 	QStatus status = ER_FAIL;
 

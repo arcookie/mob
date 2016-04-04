@@ -89,9 +89,8 @@ void file_uri_replace(SessionId sessionId, const char * pJoiner, std::string & d
 		if ((end_pos = data.find("\'", start_pos)) != std::string::npos) {
 			if ((iter = std::find_if(gRecvFiles.begin(), gRecvFiles.end(), find_uri(sessionId, pJoiner, data.substr(start_pos, end_pos - start_pos).data()))) != gRecvFiles.end())
 				data.replace(start_pos, end_pos - start_pos, get_uri((*iter)->path.data()).data());
-			start_pos += p.length();
 		}
-		else start_pos++;
+		start_pos++;
 	}
 }
 
@@ -187,11 +186,6 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 		TRAIN_HEADER * pTH = (TRAIN_HEADER *)data;
 
 		if (pTH->action == ACT_END) OnDataEnd(pTH->footprint, pJoiner);
-		else if (pTH->action == ACT_SIGNAL) {
-			SYNC_SIGNAL * pSS = (SYNC_SIGNAL *)pTH->extra;
-
-			if (pSS) MissingCheck(pSS->joiner, pSS->snum);
-		}
 		else if (pTH->action == ACT_NO_MISSING) m_pMob->SetSignal(pJoiner, false);
 		else {
 			train[pTH->chain].action = pTH->action;
@@ -213,6 +207,10 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 	else if ((iter = train.find(((int*)data)[0])) != train.end()){
 		if (size == sizeof(int)) {
 			switch (iter->second.action) {
+			case ACT_SIGNAL:
+				MissingCheck(iter->second.body.z);
+				blkFree(&(iter->second.body));
+				break;
 			case ACT_MISSING:
 			{
 				sqlite3_stmt *pStmt = NULL;
@@ -220,15 +218,8 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 				SYNC_DATA sd;
 
 				strcpy_s(sd.joiner, sizeof(sd.joiner), m_pMob->GetJoinName());
-				qcc::String having;
 
-				having.assign(iter->second.body.z, iter->second.body.nUsed);
-
-				blkFree(&(iter->second.body));
-
-				printf("%s: %ssqlite>", msg->GetSender(), having.data());
-
-				QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt2, ("SELECT num, snum, base_table, redo FROM works WHERE joiner=%Q AND snum IN (%s)", sd.joiner, having.data()),
+				QUERY_SQL_V(m_pMob->GetUndoDB(), pStmt2, ("SELECT num, snum, base_table, redo FROM works WHERE joiner=%Q AND snum IN (%s)", sd.joiner, iter->second.body.z),
 					sd.snum = sqlite3_column_int(pStmt2, 1);
 					strcpy_s(sd.base_table, sizeof(sd.base_table), (const char *)sqlite3_column_text(pStmt2, 2));
 					sd.snum_prev = -1;
@@ -239,6 +230,7 @@ void CSender::OnRecvData(const InterfaceDescription::Member* /*pMember*/, const 
 					);
 					alljoyn_send(sessionId, msg->GetSender(), ACT_DATA, (char *)sqlite3_column_text(pStmt2, 3), sqlite3_column_bytes(pStmt2, 3) + 1, (const char *)&sd, sizeof(SYNC_DATA));
 				);
+				blkFree(&(iter->second.body));
 				break;
 			}
 			case ACT_DATA:

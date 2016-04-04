@@ -35,52 +35,69 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CSender
 
-void CSender::MissingCheck(const char * sJoiner /* NULL */, int nSNum /* -1 */)
+void CSender::MissingCheck(qcc::String sList /* "" */)
 {
-	mReceive::iterator b; sReceive::reverse_iterator c;
+	int sn, sn_end;
+	std::map<qcc::String, qcc::String> miss;
+	mReceive::iterator miter; sReceive::reverse_iterator siter;
 
-	for (b = m_mReceives.begin(); b != m_mReceives.end(); b++) {
-		qcc::String miss;
+	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
 
-		for (c = b->second.rbegin(); c != b->second.rend(); ) {
-			if ((*c)->data.z) {
-				int sn_end = -1;
-				int sn = (*c++)->snum - 1;
+		for (siter = miter->second.rbegin(); siter != miter->second.rend();) {
+			if ((*siter)->data.z) {
+				sn_end = -1;
+				sn = (*siter++)->snum - 1;
 
-				if (c == b->second.rend() && sn > 0) sn_end = 0;
-				else if(c != b->second.rend() && sn != (*c)->snum_end) sn_end = (*c)->snum_end;
+				if (siter == miter->second.rend() && sn > 0) sn_end = 0;
+				else if (siter != miter->second.rend() && sn != (*siter)->snum_end) sn_end = (*siter)->snum_end;
 
 				if (sn_end >= 0) {
 					while (sn > sn_end) {
-						if (miss != "") miss += ",";
-						miss += qcc::I32ToString(sn);
+						if (miss[miter->first] != "") miss[miter->first] += ",";
+						miss[miter->first] += qcc::I32ToString(sn);
 						--sn;
 					}
 				}
 			}
 			else break;
 		}
+	}
 
-		if (sJoiner && b->first == sJoiner && nSNum > 0) {
-			if ((c = b->second.rbegin()) == b->second.rend()) {
+	if (!sList.empty()) {
+		qcc::String joiner;
+		std::vector<qcc::String> v;
+		std::size_t p1 = 0, p2, p3;
+
+		while ((p1 = sList.find(';', p1)) != std::string::npos && (p2 = sList.find('@', p1)) != std::string::npos) {
+			if ((p3 = sList.find(';', p2)) != std::string::npos) joiner = sList.substr(p2 + 1, p3 - p2 - 1);
+			else joiner = sList.substr(p2 + 1);
+			sn = atoi(sList.substr(p1 + 1, p2 - p1 - 1).data());
+
+			if ((siter = m_mReceives[joiner].rbegin()) == m_mReceives[joiner].rend()) {
 				int n = 0;
 
-				while (++n <= nSNum) {
-					if (miss != "") miss += ",";
-					miss += qcc::I32ToString(n);
+				while (++n <= sn) {
+					if (miss[joiner] != "") miss[joiner] += ",";
+					miss[joiner] += qcc::I32ToString(n);
 				}
 			}
 			else {
-				int n = (*c)->snum_end;
+				int n = (*siter)->snum_end;
 
-				while (++n <= nSNum) {
-					if (miss != "") miss += ",";
-					miss += qcc::I32ToString(n);
+				while (++n <= sn) {
+					if (miss[joiner] != "") miss[joiner] += ",";
+					miss[joiner] += qcc::I32ToString(n);
 				}
 			}
+			p1 = p2;
 		}
-		if (!miss.empty()) m_pMob->SendData(b->first.data(), time(NULL), ACT_MISSING, m_pMob->GetSessionID(), miss.data(), miss.size());
-		else if (sJoiner && b->first == sJoiner) m_pMob->SendData(sJoiner, time(NULL), ACT_NO_MISSING, m_pMob->GetSessionID(), 0, 0);
+	}
+
+	std::map<qcc::String, qcc::String>::iterator iter;
+
+	for (iter = miss.begin(); iter != miss.end(); iter++) {
+		if (!iter->second.empty()) m_pMob->SendData(iter->first.data(), time(NULL), ACT_MISSING, m_pMob->GetSessionID(), iter->second.data(), iter->second.size() + 1);
+		else m_pMob->SendData(iter->first.data(), time(NULL), ACT_NO_MISSING, m_pMob->GetSessionID(), 0, 0);
 	}
 }
 
@@ -93,14 +110,13 @@ void CALLBACK fnMissingCheck(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWO
 
 BOOL CSender::SetMissingTimer()
 {
-	mReceive::iterator b; sReceive::reverse_iterator c;
+	mReceive::iterator miter; sReceive::reverse_iterator siter;
 
-	for (b = m_mReceives.begin(); b != m_mReceives.end(); b++) {
-		for (c = b->second.rbegin(); c != b->second.rend(); ) {
-			if ((*c)->data.z) {
-				int sn = (*c++)->snum - 1;
-				if (c != b->second.rend()) printf("%d (%d %d)\n", sn, (*c)->snum, (*c)->snum_end);
-				if ((c == b->second.rend() && sn > 0) || (c != b->second.rend() && sn != (*c)->snum_end)) {
+	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
+		for (siter = miter->second.rbegin(); siter != miter->second.rend(); ) {
+			if ((*siter)->data.z) {
+				int sn = (*siter++)->snum - 1;
+				if ((siter == miter->second.rend() && sn > 0) || (siter != miter->second.rend() && sn != (*siter)->snum_end)) {
 					SetTimer(NULL, TM_MISSING_CHECK, INT_MISSING_CHECK, &fnMissingCheck);
 					return TRUE;
 				}

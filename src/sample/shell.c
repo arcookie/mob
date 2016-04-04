@@ -4566,7 +4566,7 @@ static void usage()
 	exit(EXIT_FAILURE);
 }
 
-static int alljoyn_init(int argc, char** argv)
+static void alljoyn_init(int argc, char** argv)
 {
 	char * joinName = 0;
 	char * advertisedName = 0;
@@ -4606,12 +4606,10 @@ static int alljoyn_init(int argc, char** argv)
 		usage();
 	}
 
-	int ret = mob_connect((advertisedName ? 1 : 0), (advertisedName ? advertisedName : joinName));
+	mob_init((advertisedName ? 1 : 0), (advertisedName ? advertisedName : joinName));
 
 	if (advertisedName) sqlite3_free(advertisedName);
 	if (joinName) sqlite3_free(joinName);
-
-	return ret;
 }
 
 void ReceiveProc(sqlite3 * pDb)
@@ -4628,10 +4626,7 @@ int SQLITE_CDECL main(int argc, char **argv){
   int rc = 0;
   int warnInmemoryDb = 0;
 
-  if (alljoyn_init(argc, argv)) {
-	  utf8_printf(stderr, "Error occured in mob_init().\n");
-	  exit(1);
-  }
+  alljoyn_init(argc, argv);
 
   mob_receive_proc(&ReceiveProc);
 
@@ -4686,6 +4681,7 @@ int SQLITE_CDECL main(int argc, char **argv){
   */
 //  if( access(data.zDbFilename, 0)==0 ){
     open_db(&data, 0);
+	mob_connect();
 //  }
 
   /* Process the initialization file if there is one.  If no -init option

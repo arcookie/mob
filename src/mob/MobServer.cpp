@@ -26,18 +26,18 @@
 
 #include "MobServer.h"
 
-QStatus CMobServer::Init(const char * sSvrName) 
+QStatus CMobServer::Connect()
 {
-	QStatus status = CAlljoynMob::Init(NULL);
+	QStatus status = CAlljoynMob::Connect();
 
 	if (ER_OK == status) {
-		status = m_pBus->RequestName(sSvrName, DBUS_NAME_FLAG_DO_NOT_QUEUE);
+		status = m_pBus->RequestName(m_sSvrName.data(), DBUS_NAME_FLAG_DO_NOT_QUEUE);
 
 		if (ER_OK == status) {
-			printf("RequestName('%s') succeeded.\n", sSvrName);
+			printf("RequestName('%s') succeeded.\n", m_sSvrName.data());
 		}
 		else {
-			printf("RequestName('%s') failed (status=%s).\n", sSvrName, QCC_StatusText(status));
+			printf("RequestName('%s') failed (status=%s).\n", m_sSvrName.data(), QCC_StatusText(status));
 		}
 	}
 
@@ -58,13 +58,13 @@ QStatus CMobServer::Init(const char * sSvrName)
 	}
 
 	if (ER_OK == status) {
-		status = m_pBus->AdvertiseName(sSvrName, SERVICE_TRANSPORT_TYPE);
+		status = m_pBus->AdvertiseName(m_sSvrName.data(), SERVICE_TRANSPORT_TYPE);
 
 		if (ER_OK == status) {
-			printf("Advertisement of the service name '%s' succeeded.\n", sSvrName);
+			printf("Advertisement of the service name '%s' succeeded.\n", m_sSvrName.data());
 		}
 		else {
-			printf("Failed to advertise name '%s' (%s).\n", sSvrName, QCC_StatusText(status));
+			printf("Failed to advertise name '%s' (%s).\n", m_sSvrName.data(), QCC_StatusText(status));
 		}
 	}
 	return status;

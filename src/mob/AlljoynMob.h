@@ -45,10 +45,10 @@ class CSender;
 
 class CAlljoynMob {
 public:
-	CAlljoynMob();
+	CAlljoynMob(const char * sSvrName);
 	~CAlljoynMob();
 
-	virtual QStatus Init(const char * sSvrName);
+	virtual QStatus Connect();
 
 	void CloseDB();
 	sqlite3 * OpenDB(const char *zFilename);
@@ -75,6 +75,7 @@ public:
 	void SetSignal(const char * sJoiner, bool bSignal);
 
 protected:
+	qcc::String				m_sSvrName;
 	ajn::BusAttachment *	m_pBus;
 	int						m_nSNum;
 	CSender*				m_pSender;

@@ -35,7 +35,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // export functions
 
-int mob_connect(int nIsSvr, const char * sSvrName)
+void mob_init(int nIsSvr, const char * sSvrName)
 {
 	gWPath = get_writable_path();
 
@@ -55,10 +55,13 @@ int mob_connect(int nIsSvr, const char * sSvrName)
 	}
 #endif
 
-	if (nIsSvr == 1) gpMob = new CMobServer();
-	else gpMob = new CMobClient();
+	if (nIsSvr == 1) gpMob = new CMobServer(sSvrName);
+	else gpMob = new CMobClient(sSvrName);
+}
 
-	return gpMob->Init(sSvrName);
+int mob_connect()
+{
+	return gpMob->Connect();
 }
 
 void mob_disconnect(void)

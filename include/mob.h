@@ -31,8 +31,9 @@ extern "C" {
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// export functions
 
+	extern void mob_init(int nIsSvr, const char * sSvrName);
+	extern int mob_connect();
 	extern void mob_disconnect(void);
-	extern int mob_connect(int nIsSvr, const char * sSvrName);
 
 	extern int mob_sync_db(sqlite3 * pDb);
 	extern void mob_close_db(sqlite3 * pDb);

@@ -136,16 +136,16 @@ const qcc::String mem2file(const char * data, int length, const char * sExt)
 	return "";
 }
 
-int alljoyn_send(unsigned int nSessionID, const char * pJoiner, int nAction, char * sText, int nLength, const char * pExtra, int nExtLen)
+int alljoyn_send(unsigned int nSessionID, const char * pJoiner, int nAction, const char * sText, int nLength, const char * pExtra /* NULL */, int nExtLen /* 0 */)
 {
 	time_t footprint = time(NULL);
 	int ret = gpMob->SendData(pJoiner, footprint, nAction, nSessionID, sText, nLength, pExtra, nExtLen);
 
 	if (sText && ER_OK == ret) {
 		int l;
-		char * p = sText;
+		const char * p = sText;
 		Block data;
-		char * p2;
+		const char * p2;
 		qcc::String path;
 		FILE_SEND_ITEM fsi;
 

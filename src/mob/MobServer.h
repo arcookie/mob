@@ -31,8 +31,8 @@
 
 class CMobServer : public CAlljoynMob {
 public:
-	CMobServer() {}
-	virtual QStatus Init(const char * sSvrName);
+	CMobServer(const char * sSvrName) : CAlljoynMob(sSvrName) {}
+	virtual QStatus Connect();
 };
 
 #endif /* _MOB_SERVER_H_ */
