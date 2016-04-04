@@ -63,10 +63,10 @@ inline bool CompareApply::operator()(APPLY const * _Left, APPLY const * _Right) 
 typedef std::map<int, vApplies>	mApplies;
 typedef std::map<qcc::String, vApplies> msApplies;
 
-typedef struct FIRST_SKEY {
+typedef struct {
 	SKEY skey;
 	int num;
-};
+} FIRST_SKEY;
 
 typedef std::map<qcc::String, FIRST_SKEY> mFSKey;
 
@@ -108,14 +108,17 @@ static APPLY * find_first_apply(vApplies & applies, SKEY & prev)
 	return NULL;
 }
 
-static APPLY * find_first_apply(vApplies & applies)
-{
-	vApplies::iterator iter;
+static BOOL is_valid_applies(msApplies & applies, mFSKey & root) {
+	msApplies::iterator msiter;
+	vApplies::iterator viter;
 
-	for (iter = applies.begin(); iter != applies.end(); iter++) {
-		if ((*iter)->parent == NULL) return (*iter);
+	for (msiter = applies.begin(); msiter != applies.end(); msiter++) {
+		for (viter = msiter->second.begin(); viter != msiter->second.end(); viter++) {
+			if ((*viter)->parent == NULL && (*viter)->prev != root[msiter->first].skey) return FALSE;
+		}
 	}
-	return NULL;
+
+	return TRUE;
 }
 
 static void delete_applies(vApplies & applies)
@@ -161,7 +164,7 @@ static BOOL applies_db(sqlite3 * pMainDb, sqlite3 * pBackDb, sqlite3 * pUndoDb, 
 	msApplies::iterator msiter;
 
 	for (msiter = applies.begin(); msiter != applies.end(); msiter++) {
-		if ((pApply = root.size() > 0 ? find_first_apply(msiter->second, root[msiter->first].skey) : find_first_apply(msiter->second)) != NULL) {
+		if ((pApply = find_first_apply(msiter->second, root[msiter->first].skey)) != NULL) {
 			mApplies _applies;
 
 			collect_apply(_applies, 0, pApply);
@@ -203,8 +206,7 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 	msApplies applies;
 
 	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
-		sReceive::iterator prev = miter->second.begin();
-		for (siter = miter->second.begin(); siter != miter->second.end();) {
+		for (siter = miter->second.begin(); siter != miter->second.end(); siter++) {
 			if ((*siter)->data.z) {
 				if ((*siter)->prev.snum > 0) {
 					QUERY_SQL_V(pUndoDB, pStmt, ("SELECT num FROM works WHERE joiner=%Q AND snum=%d", (*siter)->prev.joiner.data(), (*siter)->prev.snum),
@@ -215,24 +217,17 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 						}
 					);
 				}
-
-				save2applies(applies[(*siter)->base_table], new APPLY((*siter)->prev, SKEY((*siter)->snum, miter->first.data()), (*siter)->data.z));
-
-				blkFree(&(*siter)->data);
-				if (prev != siter) {
-					(*prev)->snum_end = (*siter)->snum;
-					delete (*siter);
-					siter = miter->second.erase(siter);
+				else {
+					root[(*siter)->base_table].num = -1;
+					root[(*siter)->base_table].skey = (*siter)->prev;
 				}
-			}
-			else {
-				prev = siter;
-				siter++;
+				save2applies(applies[(*siter)->base_table], new APPLY((*siter)->prev, SKEY((*siter)->snum, miter->first.data()), (*siter)->data.z));
 			}
 		}
 	}
 
 	SKEY prev, cur;
+	BOOL bUndo = FALSE;
 	mFSKey::iterator mfiter;
 
 	for (mfiter = root.begin(); mfiter != root.end(); mfiter++) {
@@ -242,13 +237,42 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 				cur = SKEY(sqlite3_column_int(pStmt, 0), (const char *)sqlite3_column_text(pStmt, 1));
 				save2applies(applies[mfiter->first], new APPLY(prev, cur, (const char *)sqlite3_column_text(pStmt, 2)));
 				prev = cur;
+				bUndo = TRUE;
 			);
-			QUERY_SQL_V(pUndoDB, pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", mfiter->second.num, mfiter->first.data()),
-				sqlite3_exec(pMainDB, (const char *)sqlite3_column_text(pStmt, 0), 0, 0, 0);
-			);
-			EXECUTE_SQL_V(pMainDB, ("DELETE FROM works WHERE num > %d AND base_table=%Q;REINDEX works;", mfiter->second.num, mfiter->first.data()));
 		}
 	}
 
-	if (applies_db(pMainDB, m_pMob->GetBackDB(), m_pMob->GetUndoDB(), sessionId, pJoiner, applies, root) && fnReceiveProc) fnReceiveProc(pMainDB);
+	if (is_valid_applies(applies, root)) {
+		if (bUndo) {
+			for (mfiter = root.begin(); mfiter != root.end(); mfiter++) {
+				if (mfiter->second.num < INT_MAX) {
+					QUERY_SQL_V(pUndoDB, pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", mfiter->second.num, mfiter->first.data()),
+						sqlite3_exec(pMainDB, (const char *)sqlite3_column_text(pStmt, 0), 0, 0, 0);
+					);
+					EXECUTE_SQL_V(pMainDB, ("DELETE FROM works WHERE num > %d AND base_table=%Q;", mfiter->second.num, mfiter->first.data()));
+				}
+			}
+			sqlite3_exec(pMainDB, "REINDEX works;", 0, 0, 0);
+		}
+
+		for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
+			sReceive::iterator prev = miter->second.begin();
+			for (siter = miter->second.begin(); siter != miter->second.end();) {
+				if ((*siter)->data.z) {
+					blkFree(&(*siter)->data);
+					if (prev != siter) {
+						(*prev)->snum_end = (*siter)->snum;
+						delete (*siter);
+						siter = miter->second.erase(siter);
+					}
+				}
+				else {
+					prev = siter;
+					siter++;
+				}
+			}
+		}
+
+		if (applies_db(pMainDB, m_pMob->GetBackDB(), m_pMob->GetUndoDB(), sessionId, pJoiner, applies, root) && fnReceiveProc) fnReceiveProc(pMainDB);
+	}
 }

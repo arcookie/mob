@@ -86,6 +86,7 @@ public:
 	SKEY(int s, const char * j) { snum = s; joiner = j; }
 
 	bool operator==(const SKEY &other) const { return snum == other.snum && joiner == other.joiner; }
+	bool operator!=(const SKEY &other) const { return snum != other.snum || joiner != other.joiner; }
 
 	int snum;
 	qcc::String joiner;
