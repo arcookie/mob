@@ -73,6 +73,8 @@ void CSender::MissingCheck(qcc::String sList /* "" */)
 			else joiner = sList.substr(p2 + 1);
 			sn = atoi(sList.substr(p1 + 1, p2 - p1 - 1).data());
 
+			if (miss.find(joiner) == miss.end()) miss[joiner] = "";
+
 			if ((siter = m_mReceives[joiner].rbegin()) == m_mReceives[joiner].rend()) {
 				int n = 0;
 
