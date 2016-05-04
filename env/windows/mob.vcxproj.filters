@@ -15,69 +15,69 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\mob\sqldiff.c">
+    <ClCompile Include="..\..\src\mob\block.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\AlljoynMob.cpp">
+    <ClCompile Include="..\..\src\mob\sqldiff.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\Sender.cpp">
+    <ClCompile Include="..\..\src\mob\AlljoynMob.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\MobBusListener.cpp">
+    <ClCompile Include="..\..\src\mob\Applier.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\MobClient.cpp">
+    <ClCompile Include="..\..\src\mob\Export.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\MobServer.cpp">
+    <ClCompile Include="..\..\src\mob\Global.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\Receiver.cpp">
+    <ClCompile Include="..\..\src\mob\MissingCheck.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\Global.cpp">
+    <ClCompile Include="..\..\src\mob\MobBusListener.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\Export.cpp">
+    <ClCompile Include="..\..\src\mob\MobClient.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\block.c">
+    <ClCompile Include="..\..\src\mob\MobServer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\Applier.cpp">
+    <ClCompile Include="..\..\src\mob\Receiver.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mob\MissingCheck.cpp">
+    <ClCompile Include="..\..\src\mob\Sender.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\mob\AlljoynMob.h">
+    <ClInclude Include="..\..\src\mob\AlljoynMob.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\mob\Sender.h">
+    <ClInclude Include="..\..\src\mob\dbutil.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\mob\MobBusListener.h">
+    <ClInclude Include="..\..\src\mob\Global.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\mob\MobClient.h">
+    <ClInclude Include="..\..\src\mob\MobBusListener.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\mob\MobServer.h">
+    <ClInclude Include="..\..\src\mob\MobClient.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\mob\Global.h">
+    <ClInclude Include="..\..\src\mob\MobServer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\block.h">
+    <ClInclude Include="..\..\src\mob\Sender.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\mob.h">
+    <ClInclude Include="..\..\include\block.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\mob\dbutil.h">
+    <ClInclude Include="..\..\include\mob.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

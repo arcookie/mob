@@ -15,15 +15,15 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\sqlite\sqlite3.c">
+    <ClCompile Include="..\..\src\sqlite\sqlite3.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\sqlite\sqlite3.h">
+    <ClInclude Include="..\..\include\sqlite3.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\sqlite\sqlite3ext.h">
+    <ClInclude Include="..\..\include\sqlite3ext.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
