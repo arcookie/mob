@@ -20,10 +20,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\sqlite3.h">
+    <ClInclude Include="..\..\inc\sqlite3.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\sqlite3ext.h">
+    <ClInclude Include="..\..\inc\sqlite3ext.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

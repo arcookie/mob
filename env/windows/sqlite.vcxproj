@@ -87,8 +87,8 @@
     <ClCompile Include="..\..\src\sqlite\sqlite3.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\sqlite3.h" />
-    <ClInclude Include="..\..\include\sqlite3ext.h" />
+    <ClInclude Include="..\..\inc\sqlite3.h" />
+    <ClInclude Include="..\..\inc\sqlite3ext.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
