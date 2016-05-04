@@ -1,5 +1,5 @@
 This directory contains a snapshot of the SQLite trunk source code
-as of 2016-01-26 14:48 UTC, concatenated into an "amalgamation".
+as of 2016-05-02 12:18 UTC, concatenated into an "amalgamation".
 
 See https://www.sqlite.org/draft/howtocompile.html for instructions
 on how to compile these sources.
