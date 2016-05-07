@@ -28,15 +28,22 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <string>
 
 #include "curl/curl.h"
+#include "json/json.h"
 
 std::mutex m;//you can use std::lock_guard if you want to be exception safe
 
 static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream)
 {
-	size_t written = fwrite(ptr, size, nmemb, (FILE *)stream);
-	return written;
+	std::string * pCmd = (std::string *)stream;
+
+	int n = pCmd->size();
+
+	*pCmd += (const char *)ptr;
+
+	return pCmd->size() - n;
 }
 
 void makeACallFromPhoneBooth()
@@ -45,7 +52,7 @@ void makeACallFromPhoneBooth()
 
 	CURL *curl_handle;
 	static const char *pagefilename = "page.out";
-	FILE *pagefile;
+	std::string sCmd;
 
 	/* init the curl session */
 	curl_handle = curl_easy_init();
@@ -62,22 +69,21 @@ void makeACallFromPhoneBooth()
 	/* send all data to this function  */
 	curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_data);
 
-	/* open the file */
-	pagefile = fopen(pagefilename, "wb");
-	if (pagefile) {
-
 		/* write the page body to this file handle */
-		curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, pagefile);
+	curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, &sCmd);
 
-		/* get it! */
-		curl_easy_perform(curl_handle);
-
-		/* close the header file */
-		fclose(pagefile);
-	}
+	/* get it! */
+	curl_easy_perform(curl_handle);
 
 	/* cleanup curl stuff */
 	curl_easy_cleanup(curl_handle);
+
+	Json::Value jData;
+	Json::Reader read;
+
+	if (read.parse(sCmd, jData) && jData.size() > 0) {
+		printf("%s\n", jData[0L]["cmd"].asCString());
+	}
 
 	m.unlock();//man lets go of the door handle and unlocks the door
 }
