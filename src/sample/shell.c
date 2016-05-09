@@ -46,6 +46,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <signal.h>
 #include "sqlite3.h"
 #if SQLITE_USER_AUTHENTICATION
 # include "sqlite3userauth.h"
@@ -4620,11 +4621,19 @@ void ReceiveProc(sqlite3 * pDb)
 
 }
 
+void __cdecl SigIntHandler(int sig)
+{
+	mob_set_interrupt(1);
+}
+
 int SQLITE_CDECL main(int argc, char **argv){
   ShellState data;
   const char *zInitFile = 0;
   int rc = 0;
   int warnInmemoryDb = 0;
+
+  /* Install SIGINT handler. */
+  signal(SIGINT, SigIntHandler);
 
   alljoyn_init(argc, argv);
 

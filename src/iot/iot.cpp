@@ -25,15 +25,22 @@
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <iostream>
 #include <thread>
 #include <mutex>
 #include <string>
 
+#include "mob.h"
 #include "curl/curl.h"
 #include "json/json.h"
 
 std::mutex m;//you can use std::lock_guard if you want to be exception safe
+
+void __cdecl SigIntHandler(int /*sig*/)
+{
+	mob_set_interrupt(1);
+}
 
 static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream)
 {
@@ -88,8 +95,63 @@ void makeACallFromPhoneBooth()
 	m.unlock();//man lets go of the door handle and unlocks the door
 }
 
-int main()
+static void usage()
 {
+	printf("Usage: mob [-h] [-s <name>] | [-j <name>]\n");
+	exit(EXIT_FAILURE);
+}
+
+static void alljoyn_init(int argc, char** argv)
+{
+	char * joinName = 0;
+	char * advertisedName = 0;
+
+	/* Parse command line args */
+	for (int i = 1; i < argc; ++i) {
+		if (0 == strcmp("-s", argv[i])) {
+			if ((++i < argc) && (argv[i][0] != '-')) {
+				advertisedName = sqlite3_mprintf("%s%s", NAME_PREFIX, argv[i]);
+			}
+			else {
+				printf("Missing parameter for \"-s\" option\n");
+				usage();
+			}
+		}
+		else if (0 == strcmp("-j", argv[i])) {
+			if ((++i < argc) && (argv[i][0] != '-')) {
+				joinName = sqlite3_mprintf("%s%s", NAME_PREFIX, argv[i]);
+			}
+			else {
+				printf("Missing parameter for \"-j\" option\n");
+				usage();
+			}
+		}
+		else {
+			if (0 != strcmp("-h", argv[i])) printf("Unknown argument \"%s\"\n", argv[i]);
+			usage();
+		}
+	}
+	/* Validate command line */
+	if (advertisedName && joinName) {
+		printf("Must specify either -s or -j\n");
+		usage();
+	}
+	else if (!advertisedName && !joinName) {
+		printf("Cannot specify both -s  and -j\n");
+		usage();
+	}
+
+	mob_init((advertisedName ? 1 : 0), (advertisedName ? advertisedName : joinName));
+
+	if (advertisedName) sqlite3_free(advertisedName);
+	if (joinName) sqlite3_free(joinName);
+}
+
+int SQLITE_CDECL main(int argc, char **argv)
+{
+	/* Install SIGINT handler. */
+	signal(SIGINT, SigIntHandler);
+
 	curl_global_init(CURL_GLOBAL_ALL);
 
 	std::thread man1(makeACallFromPhoneBooth);
@@ -97,6 +159,19 @@ int main()
 
 	man1.join();
 	man2.join();
+
+	alljoyn_init(argc, argv);
+
+	mob_open_db(":memory:");
+	mob_connect();
+
+	const int bufSize = 1024;
+	char buf[bufSize];
+
+	while (gets(buf) && !mob_get_interrupt()) {
+	}
+
+	mob_disconnect();
 
 	return 0;
 }

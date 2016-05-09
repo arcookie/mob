@@ -28,6 +28,7 @@
 *   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#include <signal.h>
 #include <alljoyn/BusAttachment.h>
 
 #include "sqlite3.h"
@@ -89,6 +90,9 @@ protected:
 	sqlite3 *				m_pMainDB;
 	sqlite3 *				m_pBackDB;
 	sqlite3 *				m_pUndoDB;
+
+public:
+	static volatile sig_atomic_t s_interrupt;
 };
 
 extern CAlljoynMob * gpMob;

@@ -65,7 +65,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libcurld.lib;Ws2_32.lib;Wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libcurld.lib;Wldap32.lib;Shlwapi.lib;alljoyn.lib;ajrouter.lib;ws2_32.lib;Secur32.lib;crypt32.lib;Bcrypt.lib;Ncrypt.lib;iphlpapi.lib;sqlite.lib;mob.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>../../bin/debug/$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../lib/debug</AdditionalLibraryDirectories>
     </Link>
@@ -89,7 +89,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>libcurl.lib;Ws2_32.lib;Wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libcurl.lib;Wldap32.lib;Shlwapi.lib;alljoyn.lib;ajrouter.lib;ws2_32.lib;Secur32.lib;crypt32.lib;Bcrypt.lib;Ncrypt.lib;iphlpapi.lib;sqlite.lib;mob.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>../../bin/release/$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>../../lib/release</AdditionalLibraryDirectories>
     </Link>

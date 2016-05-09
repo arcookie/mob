@@ -41,6 +41,9 @@ extern "C" {
 
 	extern void mob_receive_proc(MobReceiveProc fn);
 
+	extern int mob_get_interrupt(void);
+	extern void mob_set_interrupt(int n);
+
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */
 #endif

@@ -168,3 +168,14 @@ void mob_receive_proc(MobReceiveProc fn)
 {
 	fnReceiveProc = fn;
 }
+
+int mob_get_interrupt(void)
+{
+	return CAlljoynMob::s_interrupt ? 1 : 0;
+}
+
+void mob_set_interrupt(int n)
+{
+	CAlljoynMob::s_interrupt = n;
+}
+

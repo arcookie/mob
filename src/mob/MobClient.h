@@ -27,7 +27,6 @@
 #ifndef _MOB_CLIENT_H_
 #define _MOB_CLIENT_H_
 
-#include <signal.h>
 #include "AlljoynMob.h"
 
 class CMobClient : public CAlljoynMob {

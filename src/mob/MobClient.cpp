@@ -26,18 +26,8 @@
 
 #include "MobClient.h"
 
-volatile sig_atomic_t s_interrupt = false;
-
-void CDECL_CALL SigIntHandler(int /*sig*/)
-{
-	s_interrupt = true;
-}
-
 QStatus CMobClient::Connect()
 {
-	/* Install SIGINT handler. */
-	signal(SIGINT, SigIntHandler);
-
 	QStatus status = CAlljoynMob::Connect();
 
 	if (ER_OK == status) {
