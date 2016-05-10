@@ -58,7 +58,6 @@ void makeACallFromPhoneBooth()
 	m.lock();//man gets a hold of the phone booth door and locks it. The other men wait outside
 
 	CURL *curl_handle;
-	static const char *pagefilename = "page.out";
 	std::string sCmd;
 
 	/* init the curl session */
@@ -154,24 +153,31 @@ int SQLITE_CDECL main(int argc, char **argv)
 
 	curl_global_init(CURL_GLOBAL_ALL);
 
-	std::thread man1(makeACallFromPhoneBooth);
-	std::thread man2(makeACallFromPhoneBooth);
-
-	man1.join();
-	man2.join();
-
 	alljoyn_init(argc, argv);
 
-	mob_open_db(":memory:");
+	sqlite3 * db = mob_open_db(":memory:");
+
 	mob_connect();
 
 	const int bufSize = 1024;
 	char buf[bufSize];
 
+	std::thread man1(makeACallFromPhoneBooth);
+	std::thread man2(makeACallFromPhoneBooth);
+
 	while (gets(buf) && !mob_get_interrupt()) {
+		m.lock();
+		if (sqlite3_exec(db, buf, 0, 0, NULL) == SQLITE_OK) {
+			mob_sync_db(db);
+			printf("%s\n", buf);
+		}
+		m.unlock();
 	}
 
 	mob_disconnect();
+
+	man1.join();
+	man2.join();
 
 	return 0;
 }
