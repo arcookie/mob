@@ -383,3 +383,4 @@ void CHncCommTimer::SetTimer(DWORD dwID, DWORD dwInterval, TM_FUNC fnFunc, WPARA
 
 
 */
+
