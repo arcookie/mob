@@ -13,10 +13,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\iot\iot.cpp" />
     <ClCompile Include="..\..\src\jsoncpp\jsoncpp.cpp" />
-    <ClCompile Include="ThreadTimer.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ThreadTimer.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{938DDEAA-601B-4524-9F1E-B148EA2DE6D1}</ProjectGuid>

@@ -96,6 +96,7 @@
     <ClCompile Include="..\..\src\mob\Receiver.cpp" />
     <ClCompile Include="..\..\src\mob\Sender.cpp" />
     <ClCompile Include="..\..\src\mob\sqldiff.c" />
+    <ClCompile Include="..\..\src\mob\ThreadTimer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\block.h" />
@@ -107,6 +108,7 @@
     <ClInclude Include="..\..\src\mob\MobClient.h" />
     <ClInclude Include="..\..\src\mob\MobServer.h" />
     <ClInclude Include="..\..\src\mob\Sender.h" />
+    <ClInclude Include="..\..\src\mob\ThreadTimer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
