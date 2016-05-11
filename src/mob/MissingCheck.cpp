@@ -119,6 +119,7 @@ BOOL CSender::SetMissingTimer()
 			if ((*siter)->data.z) {
 				int sn = (*siter++)->snum - 1;
 				if ((siter == miter->second.rend() && sn > 0) || (siter != miter->second.rend() && sn != (*siter)->snum_end)) {
+					// std::thread t(func, interval, );
 					SetTimer(NULL, TM_MISSING_CHECK, INT_MISSING_CHECK, &fnMissingCheck);
 					return TRUE;
 				}

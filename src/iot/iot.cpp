@@ -181,3 +181,205 @@ int SQLITE_CDECL main(int argc, char **argv)
 
 	return 0;
 }
+
+/*
+
+
+#pragma once
+
+typedef void(*TM_FUNC)(WPARAM wParam, LPARAM lParam);
+
+typedef struct {
+	HANDLE	handle;
+	BOOL	stopped;
+	DWORD	tick;
+	DWORD	timming;	
+	TM_FUNC func;
+	WPARAM	wparam;
+	LPARAM	lparam;
+} HNC_TM_INFO;
+
+class CHncCommTimer
+{
+public:
+	CHncCommTimer()	{ ZeroMemory(m_stTmInfo, sizeof(m_stTmInfo)); }
+	~CHncCommTimer();
+
+	enum {
+		T_SEND_SIGNAL = 0,
+		T_SEND_WORK_SLIST,		
+		T_CHECK_MISSING,		
+		T_VNET_POLLING,
+		T_OPEN_JSON_FILE,
+		T_CLOSE_ALIVE,
+		T_NAVIGATE,
+		T_WORK_SIGNAL,
+		T_APPLY_WORK_REPEAT,
+		T_APPLY_WORK,
+		T_LOGIN_WAIT_ON_IP_DROPPED_CLIENT,
+		T_LOGIN_FAILED,
+		T_LOGIN_WAIT,
+		T_WDB_REQUESTS,
+		T_REDRAW_MS,
+		T_CHAT_UPDATE,
+		T_COUNT
+	};
+
+	enum {
+		ELAPSE_T_SEND_SIGNAL = (CLOCKS_PER_SEC * 30),
+		ELAPSE_T_SEND_WORK_SLIST = (CLOCKS_PER_SEC * 30),
+		ELAPSE_T_CHECK_MISSING = (CLOCKS_PER_SEC / 10),
+		ELAPSE_T_VNET_POLLING = 0,
+		ELAPSE_T_OPEN_JSON_FILE = (CLOCKS_PER_SEC * 2),
+		ELAPSE_T_CLOSE_ALIVE = (CLOCKS_PER_SEC / 2),
+		ELAPSE_T_NAVIGATE = (CLOCKS_PER_SEC / 2),
+		ELAPSE_T_WORK_SIGNAL = (CLOCKS_PER_SEC * 30),
+		ELAPSE_T_APPLY_WORK_REPEAT = (CLOCKS_PER_SEC / 10),
+		ELAPSE_T_APPLY_WORK = (CLOCKS_PER_SEC / 10),
+		ELAPSE_T_LOGIN_WAIT_ON_IP_DROPPED_CLIENT = (CLOCKS_PER_SEC * 20),
+		ELAPSE_T_LOGIN_FAILED = (CLOCKS_PER_SEC * 60),
+		ELAPSE_T_LOGIN_WAIT = (CLOCKS_PER_SEC * 60),
+		ELAPSE_T_WDB_REQUESTS = (CLOCKS_PER_SEC / 2),
+		ELAPSE_T_WDB_REQUESTS_RETRY = (CLOCKS_PER_SEC * 3),
+		ELAPSE_T_REDRAW_MS = (CLOCKS_PER_SEC / 10),
+		ELAPSE_T_CHAT_UPDATE = (CLOCKS_PER_SEC / 10),
+		ELAPSE_T_COUNT = 0
+	};
+
+	void KillTimer(DWORD dwID) { if (dwID >= 0 && dwID < T_COUNT) m_stTmInfo[dwID].tick = GetTickCount(); }
+	void SetTimer(DWORD dwID, DWORD dwInterval, TM_FUNC fnFunc, WPARAM wParam, LPARAM lParam);
+
+	static void ClearTimers();
+	static void KillTimer(int nDocID, DWORD dwID);
+	static void SetTimer(int nDocID, DWORD dwID, DWORD dwInterval, TM_FUNC fnFunc, WPARAM wParam, LPARAM lParam);
+
+private:
+	static UINT WINAPI	TimerThread(LPVOID pVoid);
+
+	HNC_TM_INFO m_stTmInfo[T_COUNT];
+};
+
+extern std::map<int, CHncCommTimer*> gHncCommTimers;
+
+
+
+
+
+#include "stdafx.h"
+#include "HncCommTimer.h"
+
+#define SLEEP_TIME		100
+#define WAIT_TIME		5000
+
+class HNC_TM_PARAM{
+public:
+	HNC_TM_PARAM(WPARAM	wParam, LPARAM lParam)	{ m_wParam = wParam; m_lParam = lParam; }
+	WPARAM	m_wParam;
+	LPARAM	m_lParam;
+};
+
+std::map<int, CHncCommTimer*> gHncCommTimers;
+
+UINT WINAPI CHncCommTimer::TimerThread(LPVOID pVoid)
+{
+	HNC_TM_PARAM * pHTP = (HNC_TM_PARAM *)pVoid;
+
+	if (pHTP) {
+		CHncCommTimer * pTM = (CHncCommTimer *)pHTP->m_wParam;
+		DWORD dwID = pHTP->m_lParam;
+
+		delete pHTP;
+
+		if (dwID >= 0 && dwID < T_COUNT) {
+			DWORD dwTick = pTM->m_stTmInfo[dwID].tick;
+			DWORD dwCount = pTM->m_stTmInfo[dwID].timming / 100;
+			DWORD dwTimming = pTM->m_stTmInfo[dwID].timming % 100;
+
+			while (dwCount-- > 0 && pTM->m_stTmInfo[dwID].tick == dwTick) Sleep(100);
+
+			if (pTM->m_stTmInfo[dwID].tick == dwTick && dwTimming > 0) Sleep(dwTimming);
+			if (pTM->m_stTmInfo[dwID].tick == dwTick) pTM->m_stTmInfo[dwID].func(pTM->m_stTmInfo[dwID].wparam, pTM->m_stTmInfo[dwID].lparam);
+
+			pTM->m_stTmInfo[dwID].stopped = true;
+		}
+	}
+
+	return 0;
+}
+
+CHncCommTimer::~CHncCommTimer()
+{
+	int i = -1;
+
+	while (++i < T_COUNT) {
+		m_stTmInfo[i].tick = (DWORD)(-1);
+		UINT nCount = 0;
+		while (1) {
+			DWORD dwExitCode = 0L;
+			GetExitCodeThread(m_stTmInfo[i].handle, &dwExitCode);
+			if (dwExitCode == STILL_ACTIVE) {
+				if (nCount < (WAIT_TIME / SLEEP_TIME)) {
+					nCount++;
+					Sleep(SLEEP_TIME);
+				}
+				else {
+					TerminateThread(m_stTmInfo[i].handle, dwExitCode);
+					break;
+				}
+			}
+			else break;
+		}
+	}
+}
+
+void CHncCommTimer::ClearTimers()
+{
+	std::map<int, CHncCommTimer*>::const_iterator iter;
+
+	for (iter = gHncCommTimers.begin(); iter != gHncCommTimers.end(); iter++) {
+		delete iter->second;
+	}
+
+	gHncCommTimers.clear();
+}
+
+void CHncCommTimer::KillTimer(int nDocID, DWORD dwID)
+{
+	std::map<int, CHncCommTimer*>::const_iterator iter = gHncCommTimers.find(nDocID);
+
+	if (iter != gHncCommTimers.end()) iter->second->KillTimer(dwID);
+}
+
+void CHncCommTimer::SetTimer(int nDocID, DWORD dwID, DWORD dwInterval, TM_FUNC fnFunc, WPARAM wParam, LPARAM lParam)
+{
+	CHncCommTimer * pHCT;
+	std::map<int, CHncCommTimer*>::const_iterator iter = gHncCommTimers.find(nDocID);
+
+	if (iter == gHncCommTimers.end()) {
+		pHCT = new CHncCommTimer;
+		gHncCommTimers[nDocID] = pHCT;
+	}
+	else pHCT = iter->second;
+
+	pHCT->SetTimer(dwID, dwInterval, fnFunc, wParam, lParam);
+}
+
+void CHncCommTimer::SetTimer(DWORD dwID, DWORD dwInterval, TM_FUNC fnFunc, WPARAM wParam, LPARAM lParam)
+{
+	if (dwID >= 0 && dwID < T_COUNT) {
+
+		m_stTmInfo[dwID].tick = GetTickCount();
+		if (m_stTmInfo[dwID].tick > 0) {
+			m_stTmInfo[dwID].timming = dwInterval;
+			m_stTmInfo[dwID].func = fnFunc;
+			m_stTmInfo[dwID].wparam = wParam;
+			m_stTmInfo[dwID].lparam = lParam;
+			m_stTmInfo[dwID].stopped = false;
+
+			m_stTmInfo[dwID].handle = (HANDLE)_beginthreadex(NULL, 0, TimerThread, (LPVOID)(new HNC_TM_PARAM((WPARAM)this, (LPARAM)dwID)), 0, 0);
+		}
+	}
+}
+
+
+*/

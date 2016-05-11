@@ -149,8 +149,7 @@ int mob_sync_db(sqlite3 * pDb)
 			if (gpMob->IsConnected()) {
 				alljoyn_send(session_id, NULL, ACT_DATA, redo.z, redo.nUsed + 1, (const char *)&sd, sizeof(SYNC_DATA));
 
-// there are no general rule about timer. so it most be considered when we apply this to real product.
-//				gpMob->SetSignal(NULL, true);
+				gpMob->SetSignal(NULL, true);
 //				SetTimer(NULL, TM_SEND_SIGNAL, INT_SEND_SIGNAL, (TIMERPROC)&fnSendSignal);
 			}
 			blkFree(&redo);
