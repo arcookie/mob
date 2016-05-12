@@ -34,6 +34,8 @@
 #define INT_SEND_SIGNAL		5000
 #define INT_WEB_POLLING		5000
 
+#define WEB_POLLING_URL	"http://www.arcookie.com/cmd.json"
+
 class CThreadTimer
 {
 public:

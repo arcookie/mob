@@ -64,7 +64,12 @@ void mob_init(int nIsSvr, const char * sSvrName)
 
 int mob_connect()
 {
-	return gpMob->Connect();
+	int n = gpMob->Connect();
+
+	if (!gpWebPollingTimer) gpWebPollingTimer = new CWebPollingTimer();
+	else gpWebPollingTimer->SetTimer();
+
+	return n;
 }
 
 void mob_disconnect(void)

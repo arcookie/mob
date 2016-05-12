@@ -107,7 +107,7 @@ void CWebPollingTimer::run()
 	curl_handle = curl_easy_init();
 
 	/* set URL to get here */
-	curl_easy_setopt(curl_handle, CURLOPT_URL, "http://www.arcookie.com/cmd.json");
+	curl_easy_setopt(curl_handle, CURLOPT_URL, WEB_POLLING_URL);
 
 	/* Switch on full protocol/debug output while testing */
 	curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1L);
@@ -127,12 +127,19 @@ void CWebPollingTimer::run()
 	/* cleanup curl stuff */
 	curl_easy_cleanup(curl_handle);
 
+	int cnt;
 	Json::Value jData;
 	Json::Reader read;
 
-	if (read.parse(sCmd, jData) && jData.size() > 0) {
-		printf("%s\n", jData[0L]["cmd"].asCString());
+	if (read.parse(sCmd, jData) && (cnt = jData.size()) > 0) {
+		int i = -1;
+
+		while (++i < cnt) {
+			if (sqlite3_exec(gpMob->GetMainDB(), jData[i]["cmd"].asCString(), 0, 0, NULL) == SQLITE_OK) {
+				mob_sync_db(gpMob->GetMainDB());
+			}
+		}
 	}
 
-	m[2].unlock();//man lets go of the door handle and unlocks the door
+	m[2].unlock();
 }
