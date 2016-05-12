@@ -31,6 +31,7 @@
 #include "Global.h"
 #include "Sender.h"
 #include "AlljoynMob.h"
+#include "ThreadTimer.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CSender
@@ -40,6 +41,8 @@ void CSender::MissingCheck(qcc::String sList /* "" */)
 	int sn, sn_end;
 	std::map<qcc::String, qcc::String> miss;
 	mReceive::iterator miter; sReceive::reverse_iterator siter;
+
+	m[0].lock();
 
 	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
 
@@ -95,6 +98,8 @@ void CSender::MissingCheck(qcc::String sList /* "" */)
 		}
 	}
 
+	m[0].unlock();
+
 	std::map<qcc::String, qcc::String>::iterator iter;
 
 	for (iter = miss.begin(); iter != miss.end(); iter++) {
@@ -103,30 +108,31 @@ void CSender::MissingCheck(qcc::String sList /* "" */)
 	}
 }
 
-void CALLBACK fnMissingCheck(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR idEvent, DWORD /*dwTime*/)
-{
-	KillTimer(NULL, idEvent);
-	
-	gpMob->MissingCheck();
-}
-
 BOOL CSender::SetMissingTimer()
 {
 	mReceive::iterator miter; sReceive::reverse_iterator siter;
+
+	m[0].lock();
 
 	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
 		for (siter = miter->second.rbegin(); siter != miter->second.rend(); ) {
 			if ((*siter)->data.z) {
 				int sn = (*siter++)->snum - 1;
 				if ((siter == miter->second.rend() && sn > 0) || (siter != miter->second.rend() && sn != (*siter)->snum_end)) {
-					// std::thread t(func, interval, );
-					SetTimer(NULL, TM_MISSING_CHECK, INT_MISSING_CHECK, &fnMissingCheck);
+
+					m[0].unlock();
+
+					if (!gpMissingCheckTimer) gpMissingCheckTimer = new CMissingCheckTimer();
+					else gpMissingCheckTimer->SetTimer();
+
 					return TRUE;
 				}
 			}
 			else break;
 		}
 	}
+
+	m[0].unlock();
 
 	return FALSE;
 }

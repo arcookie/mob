@@ -52,7 +52,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>QCC_OS_GROUP_WINDOWS;ROUTER;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>QCC_OS_GROUP_WINDOWS;ROUTER;WIN32;_DEBUG;_LIB;CURL_STATICLIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>../../inc</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -70,7 +70,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>QCC_OS_GROUP_WINDOWS;ROUTER;WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>QCC_OS_GROUP_WINDOWS;ROUTER;WIN32;NDEBUG;_LIB;CURL_STATICLIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>../../inc</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -99,8 +99,8 @@
     <ClCompile Include="..\..\src\mob\ThreadTimer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\block.h" />
-    <ClInclude Include="..\..\include\mob.h" />
+    <ClInclude Include="..\..\inc\block.h" />
+    <ClInclude Include="..\..\inc\mob.h" />
     <ClInclude Include="..\..\src\mob\AlljoynMob.h" />
     <ClInclude Include="..\..\src\mob\dbutil.h" />
     <ClInclude Include="..\..\src\mob\Global.h" />

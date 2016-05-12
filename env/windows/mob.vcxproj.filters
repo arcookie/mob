@@ -77,13 +77,13 @@
     <ClInclude Include="..\..\src\mob\Sender.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\block.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\mob.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\mob\ThreadTimer.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\inc\block.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\inc\mob.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

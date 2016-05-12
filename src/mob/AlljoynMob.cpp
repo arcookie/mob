@@ -47,6 +47,7 @@ CAlljoynMob::CAlljoynMob(const char * sSvrName)
 	m_pBackDB = NULL;
 	m_pUndoDB = NULL;
 	m_sSvrName = sSvrName;
+	m_bIsConnected = false;
 }
 
 CAlljoynMob::~CAlljoynMob() 
@@ -107,12 +108,17 @@ BOOL CAlljoynMob::SendSignal()
 		mSignals::iterator iter;
 		qcc::String signal = (const char *)sqlite3_column_text(pStmt, 0);
 
+		m[1].lock();
+
 		for (iter = m_mSignals.begin(); iter != m_mSignals.end(); iter++) {
 			if (iter->second) {
 				alljoyn_send(m_nSessionID, iter->first.data(), ACT_SIGNAL, signal.data(), signal.size() + 1);
 				bSend = TRUE;
 			}
 		}
+
+		m[1].unlock();
+
 		break;
 	);
 
@@ -121,6 +127,8 @@ BOOL CAlljoynMob::SendSignal()
 
 void CAlljoynMob::SetSignal(const char * sJoiner, bool bSignal) 
 { 
+	m[1].lock();
+
 	if (sJoiner) m_mSignals[sJoiner] = bSignal;
 	else {
 		mSignals::iterator iter;
@@ -129,6 +137,10 @@ void CAlljoynMob::SetSignal(const char * sJoiner, bool bSignal)
 			iter->second = bSignal;
 		}
 	}
+
+	m_bIsConnected = (m_mSignals.begin() != m_mSignals.end());
+
+	m[1].unlock();
 }
 
 QStatus CAlljoynMob::Connect()

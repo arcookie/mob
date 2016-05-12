@@ -50,11 +50,6 @@ using namespace ajn;
 
 #define TRAIN_HEADER(a)	int __o__[TRAIN_MARK_END] = {TRAIN_MARK_1,TRAIN_MARK_2,TRAIN_MARK_3,TRAIN_MARK_4,TRAIN_MARK_5,TRAIN_MARK_6,}; memcpy((char *)(a), (char *)__o__, sizeof(__o__));
 
-#define TM_MISSING_CHECK	1
-#define TM_SEND_SIGNAL		2
-#define INT_MISSING_CHECK	2000
-#define INT_SEND_SIGNAL		5000
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // typedef
 

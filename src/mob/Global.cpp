@@ -33,6 +33,7 @@
 #include "AlljoynMob.h"
 
 
+std::mutex m[NUM_OF_MUTEXES];
 qcc::String gWPath;
 HANDLE gMutex = NULL;
 CAlljoynMob * gpMob = NULL;

@@ -205,6 +205,8 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 	sReceive::iterator siter;
 	msApplies applies;
 
+	m[0].lock();
+
 	for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
 		for (siter = miter->second.begin(); siter != miter->second.end(); siter++) {
 			if ((*siter)->data.z) {
@@ -225,6 +227,8 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 			}
 		}
 	}
+
+	m[0].unlock();
 
 	SKEY prev, cur;
 	BOOL bUndo = FALSE;
@@ -255,6 +259,8 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 			sqlite3_exec(pMainDB, "REINDEX works;", 0, 0, 0);
 		}
 
+		m[0].lock();
+
 		for (miter = m_mReceives.begin(); miter != m_mReceives.end(); miter++) {
 			sReceive::iterator prev = miter->second.begin();
 			for (siter = miter->second.begin(); siter != miter->second.end();) {
@@ -272,6 +278,8 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 				}
 			}
 		}
+
+		m[0].unlock();
 
 		if (applies_db(pMainDB, m_pMob->GetBackDB(), m_pMob->GetUndoDB(), sessionId, pJoiner, applies, root) && fnReceiveProc) fnReceiveProc(pMainDB);
 	}

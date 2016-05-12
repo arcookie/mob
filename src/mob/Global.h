@@ -27,6 +27,7 @@
 #ifndef _GLOBAL_H_
 #define _GLOBAL_H_
 
+#include <mutex>
 #include "mob.h"
 #include "qcc/String.h"
 #include "sqlite3.h"
@@ -54,6 +55,8 @@ if (sqlite3_prepare_v2(__db__, __sql__, -1, &__stmt__, NULL) == SQLITE_OK) {\
 #define EXECUTE_SQL_V(__db__, __sql__, ...)	\
 		{ char * __zSQL__ = sqlite3_mprintf __sql__; if (__zSQL__) { sqlite3_exec(__db__, __zSQL__, 0, 0, 0); sqlite3_free(__zSQL__); }}
 
+#define NUM_OF_MUTEXES	3
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // types
 
@@ -74,6 +77,7 @@ class CAlljoynMob;
 // global variables
 
 extern HANDLE gMutex;
+extern std::mutex m[NUM_OF_MUTEXES];
 extern qcc::String gWPath;
 extern CAlljoynMob * gpMob;
 extern MobReceiveProc fnReceiveProc;

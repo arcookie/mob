@@ -30,7 +30,8 @@
 #include <alljoyn/Init.h>
 #include "MobClient.h"
 #include "MobServer.h"
-
+#include "ThreadTimer.h"
+#include "curl/curl.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // export functions
@@ -43,6 +44,8 @@ void mob_init(int nIsSvr, const char * sSvrName)
 
 	gMutex = CreateMutex(NULL, TRUE, "PreverntSecondInstanceOfMob");
 	if (GetLastError() != ERROR_ALREADY_EXISTS) remove_dir(gWPath);
+
+	curl_global_init(CURL_GLOBAL_ALL);
 
 	QStatus status = AllJoynInit();
 
@@ -66,6 +69,10 @@ int mob_connect()
 
 void mob_disconnect(void)
 {
+	if (gpSignalTimer) delete gpSignalTimer;
+	if (gpWebPollingTimer) delete gpWebPollingTimer;
+	if (gpMissingCheckTimer) delete gpMissingCheckTimer;
+
 	if (gpMob) {
 		delete gpMob;
 		gpMob = NULL;
@@ -90,11 +97,6 @@ sqlite3 * mob_open_db(const char * sPath)
 void mob_close_db(sqlite3 * pDb)
 {
 	gpMob->CloseDB();
-}
-
-void CALLBACK fnSendSignal(HWND /*hwnd*/, UINT /*uMsg*/, UINT idEvent, DWORD /*dwTime*/)
-{
-	if (!gpMob->SendSignal()) KillTimer(NULL, idEvent);
 }
 
 int mob_sync_db(sqlite3 * pDb)
@@ -150,7 +152,9 @@ int mob_sync_db(sqlite3 * pDb)
 				alljoyn_send(session_id, NULL, ACT_DATA, redo.z, redo.nUsed + 1, (const char *)&sd, sizeof(SYNC_DATA));
 
 				gpMob->SetSignal(NULL, true);
-//				SetTimer(NULL, TM_SEND_SIGNAL, INT_SEND_SIGNAL, (TIMERPROC)&fnSendSignal);
+
+				if (!gpSignalTimer) gpSignalTimer = new CSignalTimer();
+				else gpSignalTimer->SetTimer();
 			}
 			blkFree(&redo);
 			blkFree(&undo);

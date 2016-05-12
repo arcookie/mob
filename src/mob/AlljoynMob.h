@@ -75,7 +75,7 @@ public:
 	BOOL SendSignal();
 	void SetSignal(const char * sJoiner, bool bSignal);
 
-	BOOL IsConnected()	{ return (m_mSignals.begin() != m_mSignals.end()); }
+	BOOL IsConnected()	{ return m_bIsConnected; }
 	void RemoveSignalMember(const char * sJoiner) { mSignals::iterator iter = m_mSignals.find(sJoiner); if (iter != m_mSignals.end()) m_mSignals.erase(iter); }
 
 protected:
@@ -86,6 +86,7 @@ protected:
 	SessionId				m_nSessionID;
 	MobBusListener			m_BusListener;
 	mSignals				m_mSignals;
+	bool					m_bIsConnected;
 
 	sqlite3 *				m_pMainDB;
 	sqlite3 *				m_pBackDB;

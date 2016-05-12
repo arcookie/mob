@@ -111,11 +111,15 @@ CSender::~CSender()
 		mReceive::iterator _iter;
 		sReceive::iterator __iter;
 
+		m[0].lock();
+
 		for (_iter = m_mReceives.begin(); _iter != m_mReceives.end(); _iter++) {
 			for (__iter = _iter->second.begin(); __iter != _iter->second.end(); __iter++) {
 				delete (*__iter);
 			}
 		}
+
+		m[0].unlock();
 	}
 }
 
@@ -130,7 +134,11 @@ void CSender::Save(SessionId sessionId, const char * pJoiner, Block * pText, con
 	pRCV->base_table = pSD->base_table;
 	blkMove(&pRCV->data, pText);
 
+	m[0].lock();
+
 	m_mReceives[pSD->joiner].insert(pRCV);
+
+	m[0].unlock();
 
 	if (!SetMissingTimer()) Apply(sessionId, pJoiner);
 }
