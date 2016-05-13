@@ -253,7 +253,7 @@ void CSender::Apply(SessionId sessionId, const char * pJoiner)
 					QUERY_SQL_V(pUndoDB, pStmt, ("SELECT undo FROM works WHERE num > %d AND base_table=%Q ORDER BY num DESC", mfiter->second.num, mfiter->first.data()),
 						sqlite3_exec(pMainDB, (const char *)sqlite3_column_text(pStmt, 0), 0, 0, 0);
 					);
-					EXECUTE_SQL_V(pMainDB, ("DELETE FROM works WHERE num > %d AND base_table=%Q;", mfiter->second.num, mfiter->first.data()));
+					EXECUTE_SQL_V(pUndoDB, ("DELETE FROM works WHERE num > %d AND base_table=%Q;", mfiter->second.num, mfiter->first.data()));
 				}
 			}
 			sqlite3_exec(pMainDB, "REINDEX works;", 0, 0, 0);

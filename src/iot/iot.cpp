@@ -90,6 +90,32 @@ static void alljoyn_init(int argc, char** argv)
 	if (joinName) sqlite3_free(joinName);
 }
 
+static void arm_angles(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+	if (argc == 3) {
+		int id = sqlite3_value_int(argv[0]);
+		int angle1 = sqlite3_value_int(argv[1]);
+		int angle2 = sqlite3_value_int(argv[2]);
+	}
+	sqlite3_result_null(context);
+}
+
+static void init_triggers(sqlite3 * db)
+{
+	const char * sql =
+		" CREATE TRIGGER tr_ins_arm AFTER INSERT ON arm BEGIN "
+		" SELECT arm_angles(NEW.id, NEW.angle1, NEW.angle2); "
+		" END; "
+		" CREATE TRIGGER tr_upd_arm AFTER UPDATE ON arm BEGIN "
+		" SELECT arm_angles(NEW.id, NEW.angle1, NEW.angle2); "
+		" END; "
+		;
+
+	sqlite3_create_function(db, "arm_angles", 3, SQLITE_ANY, NULL, &arm_angles, NULL, NULL);
+
+	sqlite3_exec(db, sql, 0, 0, NULL);
+}
+
 int SQLITE_CDECL main(int argc, char **argv)
 {
 	/* Install SIGINT handler. */
@@ -98,6 +124,8 @@ int SQLITE_CDECL main(int argc, char **argv)
 	alljoyn_init(argc, argv);
 
 	sqlite3 * db = mob_open_db(":memory:");
+
+	init_triggers(db);
 
 	mob_connect();
 
