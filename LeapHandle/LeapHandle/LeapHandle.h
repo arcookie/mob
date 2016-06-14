@@ -11,14 +11,14 @@
 #include "resource.h"		// 주 기호입니다.
 
 
-// CHncProbeApp:
+// CLeapHandleApp:
 // 이 클래스의 구현에 대해서는 LeapHandle.cpp을 참조하십시오.
 //
 
-class CHncProbeApp : public CWinApp
+class CLeapHandleApp : public CWinApp
 {
 public:
-	CHncProbeApp();
+	CLeapHandleApp();
 
 // 재정의입니다.
 public:
@@ -29,4 +29,4 @@ public:
 	DECLARE_MESSAGE_MAP()
 };
 
-extern CHncProbeApp theApp;
+extern CLeapHandleApp theApp;

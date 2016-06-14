@@ -12,30 +12,30 @@
 #endif
  
 
-// CHncProbeDlg 대화 상자
+// CLeapHandleDlg 대화 상자
 
 
 
-CHncProbeDlg::CHncProbeDlg(CWnd* pParent /*=NULL*/)
-	: CDialogEx(CHncProbeDlg::IDD, pParent)
+CLeapHandleDlg::CLeapHandleDlg(CWnd* pParent /*=NULL*/)
+	: CDialogEx(CLeapHandleDlg::IDD, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
 
-void CHncProbeDlg::DoDataExchange(CDataExchange* pDX)
+void CLeapHandleDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 }
 
-BEGIN_MESSAGE_MAP(CHncProbeDlg, CDialogEx)
+BEGIN_MESSAGE_MAP(CLeapHandleDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 END_MESSAGE_MAP()
 
 
-// CHncProbeDlg 메시지 처리기
+// CLeapHandleDlg 메시지 처리기
 
-BOOL CHncProbeDlg::OnInitDialog()
+BOOL CLeapHandleDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 
@@ -58,7 +58,7 @@ BOOL CHncProbeDlg::OnInitDialog()
 //  아래 코드가 필요합니다.  문서/뷰 모델을 사용하는 MFC 응용 프로그램의 경우에는
 //  프레임워크에서 이 작업을 자동으로 수행합니다.
 
-void CHncProbeDlg::OnPaint()
+void CLeapHandleDlg::OnPaint()
 {
 	if (IsIconic())
 	{
@@ -85,7 +85,7 @@ void CHncProbeDlg::OnPaint()
 
 // 사용자가 최소화된 창을 끄는 동안에 커서가 표시되도록 시스템에서
 //  이 함수를 호출합니다.
-HCURSOR CHncProbeDlg::OnQueryDragIcon()
+HCURSOR CLeapHandleDlg::OnQueryDragIcon()
 {
 	return static_cast<HCURSOR>(m_hIcon);
 }
